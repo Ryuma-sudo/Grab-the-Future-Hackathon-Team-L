@@ -18,7 +18,12 @@ export interface ApiStation {
   average_battery_level: number | null;
 }
 
-type FlowStep = 'idle' | 'departure-selected' | 'choose-destination-prompt' | 'picking-destination';
+export type FlowStep =
+  | 'idle'
+  | 'departure-selected'
+  | 'choose-destination-prompt'
+  | 'picking-destination'
+  | 'route-preview';
 
 interface LeafletMapComponentProps {
   stations: ApiStation[];
@@ -28,6 +33,10 @@ interface LeafletMapComponentProps {
   onStationClick: (station: ApiStation) => void;
   userPosition?: [number, number] | null;
   recenterTrigger?: number;
+  /** Actual route polyline from OSRM (lat,lng pairs) */
+  routePoints?: [number, number][];
+  /** Show dashed straight line while route is loading */
+  routeLoading?: boolean;
 }
 
 // Default center: ĐHQG-HCM campus area (Linh Trung, Thủ Đức, TP.HCM)
@@ -144,6 +153,17 @@ function RecenterMap({ position, trigger }: { position: [number, number]; trigge
   return null;
 }
 
+function FitRoute({ points }: { points: [number, number][] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length >= 2) {
+      map.fitBounds(L.latLngBounds(points), { padding: [70, 70], animate: true });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points]);
+  return null;
+}
+
 function calcCostLabel(from: ApiStation, to: ApiStation): string {
   const R = 6371;
   const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
@@ -168,20 +188,23 @@ export default function LeafletMapComponent({
   onStationClick,
   userPosition,
   recenterTrigger,
+  routePoints = [],
+  routeLoading = false,
 }: LeafletMapComponentProps) {
   const departureStation = stations.find((s) => s.id === departureId);
+  const destinationStation = stations.find((s) => s.id === destinationId);
 
-  const routePoints: [number, number][] =
-    step === 'picking-destination' && departureStation && destinationId
-      ? (() => {
-          const dest = stations.find((s) => s.id === destinationId);
-          if (!dest) return [];
-          return [
-            [departureStation.latitude, departureStation.longitude],
-            [dest.latitude, dest.longitude],
-          ];
-        })()
+  // Straight-line placeholder shown while OSRM route is loading
+  const straightLine: [number, number][] =
+    routeLoading && departureStation && destinationStation
+      ? [
+          [departureStation.latitude, departureStation.longitude],
+          [destinationStation.latitude, destinationStation.longitude],
+        ]
       : [];
+
+  const isRoutePreview = step === 'route-preview';
+  const isPickingDest = step === 'picking-destination';
 
   return (
     <MapContainer
@@ -196,14 +219,24 @@ export default function LeafletMapComponent({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       />
 
-      {/* Recenter when requested */}
       {userPosition && <RecenterMap position={userPosition} trigger={recenterTrigger} />}
 
-      {/* Route polyline */}
-      {routePoints.length === 2 && (
+      {/* Fit map to show full route once loaded */}
+      {routePoints.length >= 2 && <FitRoute points={routePoints} />}
+
+      {/* OSRM route polyline */}
+      {routePoints.length >= 2 && (
         <Polyline
           positions={routePoints}
-          pathOptions={{ color: '#16a34a', weight: 4, dashArray: '8 6', opacity: 0.85 }}
+          pathOptions={{ color: '#16a34a', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }}
+        />
+      )}
+
+      {/* Loading placeholder — dashed straight line */}
+      {straightLine.length === 2 && (
+        <Polyline
+          positions={straightLine}
+          pathOptions={{ color: '#16a34a', weight: 3, dashArray: '8 6', opacity: 0.5 }}
         />
       )}
 
@@ -212,8 +245,10 @@ export default function LeafletMapComponent({
         if (!station.is_active) return null;
         const isDeparture = station.id === departureId;
         const isDestination = station.id === destinationId;
-        const isPickingDest = step === 'picking-destination';
 
+        // In route-preview: only show departure + destination
+        if (isRoutePreview && !isDeparture && !isDestination) return null;
+        // In picking-destination: hide departure pin (replaced by route origin)
         if (isPickingDest && isDeparture) return null;
 
         const icon =

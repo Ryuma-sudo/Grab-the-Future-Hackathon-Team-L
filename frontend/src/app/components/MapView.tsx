@@ -2,18 +2,23 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { Navigation, Zap, MapPin, X, ChevronRight } from 'lucide-react';
+import { Navigation, Zap, MapPin, X, ChevronRight, ArrowRight, Clock, Route } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import type { ApiStation } from './LeafletMapComponent';
+import type { ApiStation, FlowStep } from './LeafletMapComponent';
 import { MOCK_STATIONS } from '../../lib/mockData';
 
 const LeafletMap = dynamic(() => import('./LeafletMapComponent'), { ssr: false });
 
-type FlowStep = 'idle' | 'departure-selected' | 'choose-destination-prompt' | 'picking-destination';
-
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 
-// Convert MOCK_STATIONS to ApiStation format for fallback
+interface RouteInfo {
+  distanceKm: number;
+  durationMin: number;
+  estimatedCost: number;
+}
+
+// Convert MOCK_STATIONS to ApiStation format for offline fallback
 const FALLBACK_STATIONS: ApiStation[] = MOCK_STATIONS.map((s, i) => ({
   id: i + 1,
   name: s.name,
@@ -37,8 +42,32 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function walkMinutes(distMeters: number): number {
-  return Math.max(1, Math.round(distMeters / 80));
+function formatVND(amount: number): string {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+async function fetchOsrmRoute(
+  from: ApiStation,
+  to: ApiStation,
+): Promise<{ points: [number, number][]; distanceKm: number; durationMin: number }> {
+  const url = `${OSRM_BASE}/${from.longitude},${from.latitude};${to.longitude},${to.latitude}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('OSRM error');
+  const data = await res.json();
+  const route = data.routes?.[0];
+  if (!route) throw new Error('No route');
+
+  // OSRM returns [lng, lat] — convert to Leaflet [lat, lng]
+  const points: [number, number][] = (route.geometry.coordinates as [number, number][]).map(
+    ([lng, lat]) => [lat, lng],
+  );
+  const distanceKm = Math.round((route.distance / 1000) * 10) / 10;
+  const durationMin = Math.round(route.duration / 60);
+  return { points, distanceKm, durationMin };
 }
 
 export default function MapView() {
@@ -50,6 +79,11 @@ export default function MapView() {
   const [destinationStation, setDestinationStation] = useState<ApiStation | null>(null);
   const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
+
+  // Route state
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/stations`)
@@ -71,7 +105,7 @@ export default function MapView() {
     );
   }, []);
 
-  // Walk minutes from user position to selected departure station
+  // Walk minutes from user → selected departure station
   const departureWalkMinutes = useMemo(() => {
     if (!departureStation) return null;
     if (userPosition) {
@@ -79,22 +113,48 @@ export default function MapView() {
         userPosition[0], userPosition[1],
         departureStation.latitude, departureStation.longitude,
       );
-      return walkMinutes(meters);
+      return Math.max(1, Math.round(meters / 80));
     }
-    // Fall back to mockData static value if no geolocation
-    const mock = MOCK_STATIONS.find(
-      (s) => s.name === departureStation.name,
-    );
-    return mock?.walkMinutes ?? null;
+    return MOCK_STATIONS.find((s) => s.name === departureStation.name)?.walkMinutes ?? null;
   }, [departureStation, userPosition]);
 
   const handleStationClick = useCallback(
-    (station: ApiStation) => {
-      if (step === 'picking-destination') {
+    async (station: ApiStation) => {
+      if (step === 'picking-destination' && departureStation) {
+        // Show route preview instead of navigating immediately
         setDestinationStation(station);
-        router.push(`/vehicle-selection-rental?from=${departureStation?.id}&to=${station.id}`);
+        setStep('route-preview');
+        setRouteLoading(true);
+        setRoutePoints([]);
+        setRouteInfo(null);
+
+        try {
+          const { points, distanceKm, durationMin } = await fetchOsrmRoute(departureStation, station);
+          setRoutePoints(points);
+          // Estimate cost: duration by electric scooter (price per minute)
+          const estimatedCost = durationMin * 1500;
+          setRouteInfo({ distanceKm, durationMin, estimatedCost });
+        } catch {
+          // Fallback to straight-line estimate
+          const meters = haversineMeters(
+            departureStation.latitude, departureStation.longitude,
+            station.latitude, station.longitude,
+          );
+          const distanceKm = Math.round((meters / 1000) * 10) / 10;
+          const durationMin = Math.round(distanceKm * 4);
+          setRoutePoints([
+            [departureStation.latitude, departureStation.longitude],
+            [station.latitude, station.longitude],
+          ]);
+          setRouteInfo({ distanceKm, durationMin, estimatedCost: durationMin * 1500 });
+        } finally {
+          setRouteLoading(false);
+        }
         return;
       }
+
+      if (step === 'route-preview') return; // map locked during preview
+
       if (departureStation?.id === station.id && step === 'departure-selected') {
         setDepartureStation(null);
         setStep('idle');
@@ -104,15 +164,36 @@ export default function MapView() {
       setDestinationStation(null);
       setStep('departure-selected');
     },
-    [step, departureStation, router],
+    [step, departureStation],
   );
 
   const handleChooseDeparture = () => setStep('choose-destination-prompt');
-  const handleNoDestination = () => router.push(`/vehicle-selection-rental?from=${departureStation?.id}`);
+  const handleNoDestination = () =>
+    router.push(`/vehicle-selection-rental?from=${departureStation?.id}`);
   const handleChooseDestination = () => setStep('picking-destination');
   const handleCancelPrompt = () => setStep('departure-selected');
   const handleCancelPickingDestination = () => setStep('choose-destination-prompt');
-  const handleReset = () => { setDepartureStation(null); setDestinationStation(null); setStep('idle'); };
+
+  const handleReset = () => {
+    setDepartureStation(null);
+    setDestinationStation(null);
+    setRoutePoints([]);
+    setRouteInfo(null);
+    setStep('idle');
+  };
+
+  const handleBackToDestinationPick = () => {
+    setDestinationStation(null);
+    setRoutePoints([]);
+    setRouteInfo(null);
+    setStep('picking-destination');
+  };
+
+  const handleConfirmRoute = () => {
+    router.push(
+      `/vehicle-selection-rental?from=${departureStation?.id}&to=${destinationStation?.id}`,
+    );
+  };
 
   const handleRecenter = () => {
     if (!navigator.geolocation) return;
@@ -139,6 +220,8 @@ export default function MapView() {
             onStationClick={handleStationClick}
             userPosition={userPosition}
             recenterTrigger={recenterTrigger}
+            routePoints={routePoints}
+            routeLoading={routeLoading}
           />
         )}
         {loading && (
@@ -148,7 +231,7 @@ export default function MapView() {
         )}
       </div>
 
-      {/* Departure station info card */}
+      {/* ── DEPARTURE SELECTED card ── */}
       {step === 'departure-selected' && departureStation && (
         <div className="absolute bottom-24 left-4 right-4 z-[1000] fade-in-up">
           <div className="bg-card rounded-2xl shadow-card-lg p-3 border border-border">
@@ -215,7 +298,7 @@ export default function MapView() {
         </div>
       )}
 
-      {/* Choose destination prompt modal */}
+      {/* ── CHOOSE DESTINATION PROMPT modal ── */}
       {step === 'choose-destination-prompt' && departureStation && (
         <div className="absolute inset-0 z-[1001] flex items-center justify-center bg-black/30">
           <div className="bg-card rounded-2xl shadow-card-lg p-5 mx-6 w-full max-w-xs fade-in-up">
@@ -253,7 +336,7 @@ export default function MapView() {
         </div>
       )}
 
-      {/* Picking destination banner */}
+      {/* ── PICKING DESTINATION banner ── */}
       {step === 'picking-destination' && departureStation && (
         <div className="absolute top-16 left-4 right-4 z-[1000] fade-in-up">
           <div className="bg-card rounded-2xl shadow-card-lg p-3 border-2 border-primary/30 flex items-center gap-3">
@@ -262,7 +345,7 @@ export default function MapView() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-foreground">Chọn trạm đến</p>
-              <p className="text-[10px] text-muted-foreground truncate">Nhấn vào trạm để xem giá ước tính</p>
+              <p className="text-[10px] text-muted-foreground truncate">Nhấn vào trạm để xem tuyến đường thực tế</p>
             </div>
             <button
               onClick={handleCancelPickingDestination}
@@ -274,13 +357,89 @@ export default function MapView() {
         </div>
       )}
 
-      {/* My location button */}
-      <button
-        onClick={handleRecenter}
-        className="absolute bottom-24 right-4 z-[1000] bg-card rounded-2xl p-3 shadow-card-lg active:scale-95 transition-all duration-150"
-      >
-        <Navigation size={20} className="text-primary" />
-      </button>
+      {/* ── ROUTE PREVIEW card ── */}
+      {step === 'route-preview' && departureStation && destinationStation && (
+        <div className="absolute bottom-24 left-4 right-4 z-[1000] fade-in-up">
+          <div className="bg-card rounded-2xl shadow-card-lg border border-border overflow-hidden">
+            {/* Route header */}
+            <div className="px-4 pt-3 pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-muted-foreground">Xuất phát</p>
+                  <p className="text-xs font-bold text-foreground truncate">{departureStation.name}</p>
+                </div>
+                <ArrowRight size={14} className="text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0 text-right">
+                  <p className="text-[10px] text-muted-foreground">Trạm đến</p>
+                  <p className="text-xs font-bold text-accent truncate">{destinationStation.name}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Route stats */}
+            <div className="px-4 py-3">
+              {routeLoading ? (
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs text-muted-foreground">Đang tính tuyến đường...</p>
+                </div>
+              ) : routeInfo ? (
+                <div className="flex items-center justify-around mb-3">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                      <Route size={11} className="text-primary" />
+                      <p className="text-sm font-bold text-foreground tabular-nums">{routeInfo.distanceKm} km</p>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">khoảng cách</p>
+                  </div>
+                  <div className="w-px h-8 bg-border" />
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 mb-0.5">
+                      <Clock size={11} className="text-primary" />
+                      <p className="text-sm font-bold text-foreground tabular-nums">{routeInfo.durationMin} phút</p>
+                    </div>
+                    <p className="text-[9px] text-muted-foreground">thời gian xe</p>
+                  </div>
+                  <div className="w-px h-8 bg-border" />
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-primary tabular-nums">
+                      {formatVND(routeInfo.estimatedCost)}
+                    </p>
+                    <p className="text-[9px] text-muted-foreground">ước tính</p>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleBackToDestinationPick}
+                  className="flex-1 py-2.5 rounded-xl border border-border text-xs font-semibold text-foreground active:scale-95 transition-all duration-150"
+                >
+                  Đổi trạm đến
+                </button>
+                <button
+                  onClick={handleConfirmRoute}
+                  disabled={routeLoading}
+                  className="flex-[2] flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white rounded-xl text-xs font-semibold active:scale-95 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Zap size={12} fill="white" />
+                  Đặt xe ngay
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* My location button — hidden during route preview to avoid confusion */}
+      {step !== 'route-preview' && (
+        <button
+          onClick={handleRecenter}
+          className="absolute bottom-24 right-4 z-[1000] bg-card rounded-2xl p-3 shadow-card-lg active:scale-95 transition-all duration-150"
+        >
+          <Navigation size={20} className="text-primary" />
+        </button>
+      )}
     </div>
   );
 }
