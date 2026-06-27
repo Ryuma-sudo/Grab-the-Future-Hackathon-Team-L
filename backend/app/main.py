@@ -7,6 +7,7 @@ from app.routers import trip as trip_router
 from app.routers import user as user_router
 from app.routers import vehicle as vehicle_router
 from app.routers import routing as ai_router
+from app.routers import recommendation as recommendation_router
 from fastapi.middleware.cors import CORSMiddleware
 
 Base.metadata.create_all(bind=engine)
@@ -29,7 +30,7 @@ app.include_router(vehicle_router.router)
 app.include_router(station_router.router)
 app.include_router(trip_router.router)
 app.include_router(ai_router.router)
-
+app.include_router(recommendation_router.router)
 
 @app.get("/")
 def health_check():
