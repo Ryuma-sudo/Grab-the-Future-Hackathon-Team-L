@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from app.service.routing import calculate_route
 
-router = APIRouter( tags=["Routing"])
+router = APIRouter()
 
 class Station(BaseModel):
     id: int
