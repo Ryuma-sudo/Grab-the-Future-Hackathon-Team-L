@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f0fdf4;
+  --foreground: #0f172a;
+  --primary: #16a34a;
+  --primary-foreground: #ffffff;
+  --secondary: #dcfce7;
+  --secondary-foreground: #15803d;
+  --accent: #f59e0b;
+  --accent-foreground: #ffffff;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #16a34a;
+  --radius: 12px;
+  --font-sans: var(--font-plus-jakarta-sans), sans-serif;
+  --danger: #ef4444;
+  --danger-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --info: #3b82f6;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  h1, h2, h3, h4, h5, h6, p {
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .map-container {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 25%, #a5d6a7 50%, #c8e6c9 75%, #e8f5e9 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .map-grid {
+    background-image:
+      linear-gradient(rgba(22, 163, 74, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(22, 163, 74, 0.08) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .map-road-h {
+    position: absolute;
+    height: 8px;
+    background: #ffffff;
+    border-top: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
+    opacity: 0.8;
+  }
+
+  .map-road-v {
+    position: absolute;
+    width: 8px;
+    background: #ffffff;
+    border-left: 1px solid #d1d5db;
+    border-right: 1px solid #d1d5db;
+    opacity: 0.8;
+  }
+
+  .map-road-major {
+    background: #f5f5f5;
+    height: 14px;
+    border-top: 1.5px solid #bdbdbd;
+    border-bottom: 1.5px solid #bdbdbd;
+  }
+
+  .station-pin {
+    position: absolute;
+    transform: translate(-50%, -100%);
+    cursor: pointer;
+    transition: transform 150ms ease, filter 150ms ease;
+    z-index: 10;
+  }
+
+  .station-pin:hover {
+    transform: translate(-50%, -100%) scale(1.15);
+  }
+
+  .station-pin.active {
+    transform: translate(-50%, -100%) scale(1.2);
+    filter: drop-shadow(0 4px 8px rgba(22, 163, 74, 0.5));
+    z-index: 20;
+  }
+
+  .route-line {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  .bottom-sheet {
+    transition: transform 350ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .battery-bar {
+    transition: width 600ms ease;
+  }
+
+  .pulse-dot {
+    animation: pulseDot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.7; }
+  }
+
+  .trip-counter {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .low-battery-alert {
+    animation: alertSlide 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes alertSlide {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .vehicle-card-hover {
+    transition: all 200ms ease;
+  }
+
+  .vehicle-card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(22, 163, 74, 0.15);
+  }
+
+  .qr-scanner-frame {
+    position: relative;
+  }
+
+  .qr-scanner-frame::before,
+  .qr-scanner-frame::after {
+    content: '';
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: #16a34a;
+    border-style: solid;
+  }
+
+  .qr-scanner-frame::before {
+    top: 0;
+    left: 0;
+    border-width: 3px 0 0 3px;
+    border-radius: 4px 0 0 0;
+  }
+
+  .qr-scanner-frame::after {
+    bottom: 0;
+    right: 0;
+    border-width: 0 3px 3px 0;
+    border-radius: 0 0 4px 0;
+  }
+
+  .scan-line {
+    animation: scanMove 2s linear infinite;
+  }
+
+  @keyframes scanMove {
+    0% { top: 10%; }
+    50% { top: 85%; }
+    100% { top: 10%; }
+  }
+
+  .fade-in-up {
+    animation: fadeInUp 0.3s ease forwards;
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .map-block {
+    border-radius: 4px;
+    background: rgba(226, 232, 240, 0.6);
+  }
+
+  .map-block-green {
+    background: rgba(187, 247, 208, 0.7);
+    border-radius: 4px;
+  }
+}
