@@ -28,6 +28,9 @@ class Trip(Base):
     distance_km = Column(Float, nullable=True)
     duration_minutes = Column(Integer, nullable=True)
     cost_vnd = Column(Float, nullable=True)
+    battery_before_trip = Column(Float, nullable=True)
+    battery_after_trip = Column(Float, nullable=True)
+    battery_used_percent = Column(Float, nullable=True)
 
     user = relationship("User", back_populates="trips")
     vehicle = relationship("Vehicle", back_populates="trips")
