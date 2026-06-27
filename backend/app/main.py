@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Base, engine
 from app.models import station, trip, user, vehicle
@@ -15,6 +16,17 @@ app = FastAPI(
     title="Grab Last-Mile E-Motorbike API",
     description="Backend API for metro/bus + e-motorbike last-mile rental service.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:4028",
+        "http://127.0.0.1:4028",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(user_router.router)
