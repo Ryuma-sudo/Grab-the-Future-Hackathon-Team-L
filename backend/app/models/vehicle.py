@@ -25,3 +25,4 @@ class Vehicle(Base):
     status = Column(SqlEnum(VehicleStatus), nullable=False, default=VehicleStatus.READY)
 
     station = relationship("Station", back_populates="vehicles")
+    trips = relationship("Trip", back_populates="vehicle")

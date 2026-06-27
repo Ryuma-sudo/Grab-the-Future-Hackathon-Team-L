@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 
 from app.config import Base, engine
-from app.models import station, user, vehicle
+from app.models import station, trip, user, vehicle
 from app.routers import station as station_router
+from app.routers import trip as trip_router
 from app.routers import user as user_router
 from app.routers import vehicle as vehicle_router
 from app.routers import routing as ai_router
@@ -26,6 +27,7 @@ app.add_middleware(
 app.include_router(user_router.router)
 app.include_router(vehicle_router.router)
 app.include_router(station_router.router)
+app.include_router(trip_router.router)
 app.include_router(ai_router.router)
 
 
