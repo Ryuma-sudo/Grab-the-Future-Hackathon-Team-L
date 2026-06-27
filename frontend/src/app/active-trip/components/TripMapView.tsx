@@ -10,10 +10,10 @@ interface TripMapViewProps {
   distanceKm: number;
 }
 
-const HANOI_CENTER: [number, number] = [21.0285, 105.8542];
+const DHQG_CENTER: [number, number] = [10.8703, 106.8025];
 
 export default function TripMapView({ batteryPercent }: TripMapViewProps) {
-  const [userPosition, setUserPosition] = useState<[number, number]>(HANOI_CENTER);
+  const [userPosition, setUserPosition] = useState<[number, number]>(DHQG_CENTER);
 
   useEffect(() => {
     if (!navigator.geolocation) return;

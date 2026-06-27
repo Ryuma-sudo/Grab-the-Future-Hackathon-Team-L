@@ -30,7 +30,8 @@ interface LeafletMapComponentProps {
   recenterTrigger?: number;
 }
 
-const HANOI_CENTER: [number, number] = [21.0285, 105.8542];
+// Default center: ĐHQG-HCM campus area (Linh Trung, Thủ Đức, TP.HCM)
+const DEFAULT_CENTER: [number, number] = [10.8703, 106.8025];
 
 function createStationIcon(count: number, isDeparture: boolean, isDestination: boolean) {
   let bg = count > 0 ? '#ffffff' : '#f1f5f9';
@@ -184,7 +185,7 @@ export default function LeafletMapComponent({
 
   return (
     <MapContainer
-      center={userPosition ?? HANOI_CENTER}
+      center={userPosition ?? DEFAULT_CENTER}
       zoom={15}
       style={{ width: '100%', height: '100%' }}
       zoomControl={false}

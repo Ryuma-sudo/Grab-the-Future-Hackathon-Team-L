@@ -1,16 +1,45 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Navigation, Zap, MapPin, X, ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ApiStation } from './LeafletMapComponent';
+import { MOCK_STATIONS } from '../../lib/mockData';
 
 const LeafletMap = dynamic(() => import('./LeafletMapComponent'), { ssr: false });
 
 type FlowStep = 'idle' | 'departure-selected' | 'choose-destination-prompt' | 'picking-destination';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+
+// Convert MOCK_STATIONS to ApiStation format for fallback
+const FALLBACK_STATIONS: ApiStation[] = MOCK_STATIONS.map((s, i) => ({
+  id: i + 1,
+  name: s.name,
+  address: s.address,
+  latitude: s.lat,
+  longitude: s.lng,
+  capacity: s.totalVehicles,
+  is_active: s.status !== 'closed',
+  total_vehicle_count: s.totalVehicles,
+  available_vehicle_count: s.availableVehicles,
+  average_battery_level: null,
+}));
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function walkMinutes(distMeters: number): number {
+  return Math.max(1, Math.round(distMeters / 80));
+}
 
 export default function MapView() {
   const router = useRouter();
@@ -25,8 +54,11 @@ export default function MapView() {
   useEffect(() => {
     fetch(`${API_BASE}/stations`)
       .then((r) => r.json())
-      .then((data: ApiStation[]) => setStations(data.filter((s) => s.is_active)))
-      .catch(() => setStations([]))
+      .then((data: ApiStation[]) => {
+        const active = data.filter((s) => s.is_active);
+        setStations(active.length > 0 ? active : FALLBACK_STATIONS);
+      })
+      .catch(() => setStations(FALLBACK_STATIONS))
       .finally(() => setLoading(false));
   }, []);
 
@@ -38,6 +70,23 @@ export default function MapView() {
       { enableHighAccuracy: true },
     );
   }, []);
+
+  // Walk minutes from user position to selected departure station
+  const departureWalkMinutes = useMemo(() => {
+    if (!departureStation) return null;
+    if (userPosition) {
+      const meters = haversineMeters(
+        userPosition[0], userPosition[1],
+        departureStation.latitude, departureStation.longitude,
+      );
+      return walkMinutes(meters);
+    }
+    // Fall back to mockData static value if no geolocation
+    const mock = MOCK_STATIONS.find(
+      (s) => s.name === departureStation.name,
+    );
+    return mock?.walkMinutes ?? null;
+  }, [departureStation, userPosition]);
 
   const handleStationClick = useCallback(
     (station: ApiStation) => {
@@ -64,6 +113,7 @@ export default function MapView() {
   const handleCancelPrompt = () => setStep('departure-selected');
   const handleCancelPickingDestination = () => setStep('choose-destination-prompt');
   const handleReset = () => { setDepartureStation(null); setDestinationStation(null); setStep('idle'); };
+
   const handleRecenter = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -117,14 +167,22 @@ export default function MapView() {
 
             <div className="flex items-center gap-3 mb-3">
               <div className="text-center">
-                <p className="text-base font-bold text-primary tabular-nums">{departureStation.available_vehicle_count}</p>
+                <p className="text-base font-bold text-primary tabular-nums">
+                  {departureStation.available_vehicle_count}
+                </p>
                 <p className="text-[9px] text-muted-foreground">xe có sẵn</p>
               </div>
-              <div className="w-px h-8 bg-border" />
-              <div className="text-center">
-                <p className="text-base font-bold text-foreground tabular-nums">{departureStation.total_vehicle_count}</p>
-                <p className="text-[9px] text-muted-foreground">tổng xe</p>
-              </div>
+
+              {departureWalkMinutes !== null && (
+                <>
+                  <div className="w-px h-8 bg-border" />
+                  <div className="text-center">
+                    <p className="text-base font-bold text-foreground tabular-nums">{departureWalkMinutes}</p>
+                    <p className="text-[9px] text-muted-foreground">phút đi bộ</p>
+                  </div>
+                </>
+              )}
+
               {departureStation.average_battery_level !== null && (
                 <>
                   <div className="w-px h-8 bg-border" />
@@ -136,6 +194,14 @@ export default function MapView() {
                   </div>
                 </>
               )}
+
+              <div className="w-px h-8 bg-border" />
+              <div className="text-center">
+                <p className="text-base font-bold text-foreground tabular-nums">
+                  {departureStation.total_vehicle_count}
+                </p>
+                <p className="text-[9px] text-muted-foreground">tổng xe</p>
+              </div>
             </div>
 
             <button
