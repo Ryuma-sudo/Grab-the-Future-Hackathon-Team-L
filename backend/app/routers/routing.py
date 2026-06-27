@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List
-from app.service.routing import calculate_route
+from app.services.routing import calculate_route
 
 router = APIRouter()
 

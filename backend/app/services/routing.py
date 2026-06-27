@@ -1,4 +1,3 @@
-# app/services/ai_route.py
 import requests
 from typing import Dict, Any, List
 
