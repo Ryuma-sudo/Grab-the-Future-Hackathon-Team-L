@@ -43,6 +43,7 @@ def start_trip(payload: TripStart, db: Session = Depends(get_db)):
         user_id=payload.user_id,
         vehicle_id=payload.vehicle_id,
         start_station_id=payload.start_station_id,
+        battery_before_trip=vehicle.battery_level,
     )
     vehicle.status = VehicleStatus.RENTED
     vehicle.station_id = None
@@ -86,6 +87,8 @@ def end_trip(trip_id: int, payload: TripEnd, db: Session = Depends(get_db)):
     vehicle.station_id = payload.end_station_id
     battery_usage = calculate_battery_usage_percent(payload.distance_km, vehicle.estimated_range_km)
     vehicle.battery_level = max(0, round(vehicle.battery_level - battery_usage, 2))
+    trip.battery_used_percent = battery_usage
+    trip.battery_after_trip = vehicle.battery_level
 
     db.commit()
     db.refresh(trip)

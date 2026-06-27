@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.config import Base
 
@@ -14,3 +15,5 @@ class User(Base):
     phone = Column(String(30), unique=True, index=True, nullable=True)
     hashed_password = Column(String(255), nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    trips = relationship("Trip", back_populates="user")
