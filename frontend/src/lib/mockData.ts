@@ -4,8 +4,8 @@ export interface Station {
     address: string;
     distance: number; // meters
     walkMinutes: number;
-    lat: number; // normalized 0-100 for map display
-    lng: number; // normalized 0-100 for map display
+    lat: number;  // real GPS latitude
+    lng: number;  // real GPS longitude
     availableVehicles: number;
     totalVehicles: number;
     status: 'open' | 'full' | 'closed';
@@ -31,8 +31,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '12 Đinh Tiên Hoàng, Hoàn Kiếm, Hà Nội',
         distance: 180,
         walkMinutes: 3,
-        lat: 42,
-        lng: 50,
+        lat: 21.0286,
+        lng: 105.8524,
         availableVehicles: 4,
         totalVehicles: 8,
         status: 'open',
@@ -43,8 +43,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '58 Quốc Tử Giám, Đống Đa, Hà Nội',
         distance: 650,
         walkMinutes: 9,
-        lat: 65,
-        lng: 30,
+        lat: 21.0277,
+        lng: 105.8359,
         availableVehicles: 7,
         totalVehicles: 10,
         status: 'open',
@@ -55,8 +55,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '1 Hùng Vương, Ba Đình, Hà Nội',
         distance: 1200,
         walkMinutes: 16,
-        lat: 28,
-        lng: 25,
+        lat: 21.0369,
+        lng: 105.8341,
         availableVehicles: 2,
         totalVehicles: 6,
         status: 'open',
@@ -67,8 +67,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '144 Xuân Thủy, Cầu Giấy, Hà Nội',
         distance: 2400,
         walkMinutes: 30,
-        lat: 38,
-        lng: 12,
+        lat: 21.0294,
+        lng: 105.7887,
         availableVehicles: 0,
         totalVehicles: 8,
         status: 'full',
@@ -79,8 +79,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '36 Kim Mã, Ba Đình, Hà Nội',
         distance: 900,
         walkMinutes: 12,
-        lat: 30,
-        lng: 42,
+        lat: 21.0291,
+        lng: 105.8167,
         availableVehicles: 5,
         totalVehicles: 8,
         status: 'open',
@@ -91,8 +91,8 @@ export const MOCK_STATIONS: Station[] = [
         address: '3 Lê Thái Tổ, Hoàn Kiếm, Hà Nội',
         distance: 320,
         walkMinutes: 5,
-        lat: 48,
-        lng: 58,
+        lat: 21.0276,
+        lng: 105.8527,
         availableVehicles: 3,
         totalVehicles: 6,
         status: 'open',
