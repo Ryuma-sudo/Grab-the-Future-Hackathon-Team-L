@@ -225,8 +225,9 @@ export default function MapView() {
   };
 
   const handleConfirmRoute = () => {
+    const distParam = routeInfo ? `&dist=${routeInfo.distanceKm}` : '';
     router.push(
-      `/vehicle-selection-rental?from=${departureStation?.id}&to=${destinationStation?.id}`,
+      `/vehicle-selection-rental?from=${departureStation?.id}&to=${destinationStation?.id}${distParam}`,
     );
   };
 
@@ -365,7 +366,7 @@ export default function MapView() {
 
             <div className="flex items-center gap-3 mb-3">
               <div className="text-center">
-                <p className="text-base font-bold text-primary tabular-nums">
+                <p className={`text-base font-bold tabular-nums ${departureStation.available_vehicle_count === 0 ? 'text-danger' : 'text-primary'}`}>
                   {departureStation.available_vehicle_count}
                 </p>
                 <p className="text-[9px] text-muted-foreground">xe có sẵn</p>
@@ -402,9 +403,20 @@ export default function MapView() {
               </div>
             </div>
 
+            {/* No vehicles warning */}
+            {departureStation.available_vehicle_count === 0 && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2 mb-3">
+                <Zap size={12} className="text-danger flex-shrink-0" />
+                <p className="text-[10px] text-danger font-medium">
+                  Trạm này hiện không có xe — vui lòng chọn trạm khác.
+                </p>
+              </div>
+            )}
+
             <button
               onClick={(e) => { e.stopPropagation(); handleChooseDeparture(); }}
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white rounded-xl text-[12px] font-semibold active:scale-95 transition-all duration-150"
+              disabled={departureStation.available_vehicle_count === 0}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed bg-primary text-white active:scale-95"
             >
               <Zap size={12} fill="white" />
               Chọn trạm xuất phát
