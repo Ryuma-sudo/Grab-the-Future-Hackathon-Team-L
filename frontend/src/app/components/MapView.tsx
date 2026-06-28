@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { Navigation, Zap, MapPin, X, ChevronRight, ArrowRight, Clock, Route, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ApiStation, FlowStep } from './LeafletMapComponent';
-import { MOCK_STATIONS } from '../../lib/mockData';
+import { MOCK_STATIONS, MOCK_USER_POSITION, calculateTripCost } from '../../lib/mockData';
 
 const LeafletMap = dynamic(() => import('./LeafletMapComponent'), { ssr: false });
 
@@ -102,11 +102,14 @@ export default function MapView() {
   }, []);
 
   useEffect(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setUserPosition(MOCK_USER_POSITION);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => setUserPosition([pos.coords.latitude, pos.coords.longitude]),
-      () => {},
-      { enableHighAccuracy: true },
+      () => setUserPosition(MOCK_USER_POSITION), // fallback: near Cổng Chính ĐHQG
+      { enableHighAccuracy: true, timeout: 8000 },
     );
   }, []);
 
@@ -154,7 +157,7 @@ export default function MapView() {
         try {
           const { points, distanceKm, durationMin } = await fetchOsrmRoute(departureStation, station);
           setRoutePoints(points);
-          setRouteInfo({ distanceKm, durationMin, estimatedCost: durationMin * 1500 });
+          setRouteInfo({ distanceKm, durationMin, estimatedCost: calculateTripCost(durationMin) });
         } catch {
           const meters = haversineMeters(
             departureStation.latitude, departureStation.longitude,
@@ -166,7 +169,7 @@ export default function MapView() {
             [departureStation.latitude, departureStation.longitude],
             [station.latitude, station.longitude],
           ]);
-          setRouteInfo({ distanceKm, durationMin, estimatedCost: durationMin * 1500 });
+          setRouteInfo({ distanceKm, durationMin, estimatedCost: calculateTripCost(durationMin) });
         } finally {
           setRouteLoading(false);
         }
@@ -203,8 +206,10 @@ export default function MapView() {
   );
 
   const handleChooseDeparture = () => setStep('choose-destination-prompt');
-  const handleNoDestination = () =>
-    router.push(`/vehicle-selection-rental?from=${departureStation?.id}`);
+  const handleNoDestination = () => {
+    const walkParam = departureWalkMinutes !== null ? `&walkMin=${departureWalkMinutes}` : '';
+    router.push(`/vehicle-selection-rental?from=${departureStation?.id}${walkParam}`);
+  };
   const handleChooseDestination = () => setStep('picking-destination');
   const handleCancelPrompt = () => setStep('departure-selected');
   const handleCancelPickingDestination = () => setStep('choose-destination-prompt');
@@ -226,8 +231,9 @@ export default function MapView() {
 
   const handleConfirmRoute = () => {
     const distParam = routeInfo ? `&dist=${routeInfo.distanceKm}` : '';
+    const walkParam = departureWalkMinutes !== null ? `&walkMin=${departureWalkMinutes}` : '';
     router.push(
-      `/vehicle-selection-rental?from=${departureStation?.id}&to=${destinationStation?.id}${distParam}`,
+      `/vehicle-selection-rental?from=${departureStation?.id}&to=${destinationStation?.id}${distParam}${walkParam}`,
     );
   };
 

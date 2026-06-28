@@ -148,8 +148,8 @@ export default function TripStatsBar({ trip, onEndTrip }: TripStatsBarProps) {
                 {[
                   { label: 'Mã chuyến', value: `#${trip.tripId}` },
                   { label: 'Xe', value: trip.vehicleModel },
-                  { label: 'Giá mỗi phút', value: formatVND(trip.pricePerMinute) },
-                  { label: 'Tốc độ TB', value: '30 km/h' },
+                  { label: '5 phút đầu', value: '7.000đ' },
+                  { label: 'Mỗi phút sau', value: `${formatVND(trip.pricePerMinute)}/phút` },
                   { label: 'Bảo hiểm', value: 'Đã bao gồm' },
                 ].map((row) => (
                   <div key={row.label} className="flex items-center justify-between">

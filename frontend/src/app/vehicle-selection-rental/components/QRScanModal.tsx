@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Zap, CheckCircle, Loader2, RotateCcw } from 'lucide-react';
 import type { Vehicle } from '../../../lib/mockData';
-import { getVehicleTypeLabel, formatVND } from '../../../lib/mockData';
+import { getVehicleTypeLabel, formatVND, TRIP_BASE_FEE } from '../../../lib/mockData';
 import BatteryIndicator from '../../../components/ui/BatteryIndicator';
 import { useRouter } from 'next/navigation';
 
@@ -69,7 +69,7 @@ export default function QRScanModal({ vehicle, fromId, toId, onClose }: QRScanMo
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-foreground">{vehicle.model}</p>
-          <p className="text-xs text-muted-foreground">{formatVND(vehicle.pricePerMinute)}/phút</p>
+          <p className="text-xs text-muted-foreground">{formatVND(TRIP_BASE_FEE)} / 5 phút đầu</p>
         </div>
         <BatteryIndicator percent={vehicle.batteryPercent} size="sm" />
       </div>
@@ -158,7 +158,7 @@ export default function QRScanModal({ vehicle, fromId, toId, onClose }: QRScanMo
                 <div>
                   <p className="text-[10px] text-muted-foreground mb-0.5">Giá</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">
-                    {formatVND(vehicle.pricePerMinute)}/phút
+                    {formatVND(TRIP_BASE_FEE)} / 5 phút đầu
                   </p>
                 </div>
               </div>

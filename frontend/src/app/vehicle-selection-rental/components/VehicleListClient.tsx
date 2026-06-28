@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MOCK_VEHICLES, formatVND } from '../../../lib/mockData';
+import { MOCK_VEHICLES, formatVND, TRIP_BASE_FEE, TRIP_EXTRA_RATE } from '../../../lib/mockData';
 import type { Vehicle } from '../../../lib/mockData';
 import { Zap, Battery, Route, Clock, AlertTriangle } from 'lucide-react';
 import BatteryIndicator from '../../../components/ui/BatteryIndicator';
@@ -15,6 +15,7 @@ export default function VehicleListClient() {
   const toId = searchParams.get('to');
   const distParam = searchParams.get('dist');
   const distanceKm = distParam ? parseFloat(distParam) : null;
+  const walkMin = searchParams.get('walkMin') ? parseInt(searchParams.get('walkMin')!, 10) : null;
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showQR, setShowQR] = useState(false);
@@ -65,11 +66,22 @@ export default function VehicleListClient() {
           </button>
         </div>
 
-        {/* Distance context */}
-        {distanceKm !== null && (
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <Route size={10} className="text-primary" />
-            <span>Quãng đường tới đích: <span className="font-bold text-foreground">{distanceKm} km</span> — Xe mờ không đủ pin.</span>
+        {/* Context info strip */}
+        {(distanceKm !== null || walkMin !== null) && (
+          <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
+            {walkMin !== null && (
+              <span className="flex items-center gap-1">
+                <Clock size={10} className="text-primary" />
+                Đi bộ đến trạm: <span className="font-bold text-foreground">{walkMin} phút</span>
+              </span>
+            )}
+            {distanceKm !== null && (
+              <span className="flex items-center gap-1">
+                <Route size={10} className="text-primary" />
+                Tới đích: <span className="font-bold text-foreground">{distanceKm} km</span>
+                {' '}— xe mờ không đủ pin
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -166,12 +178,12 @@ export default function VehicleListClient() {
                     </div>
                     <span className="text-[9px] text-muted-foreground">Còn đi được</span>
                   </div>
-                  <div className="flex flex-col items-center bg-muted rounded-xl p-2">
+                  <div className="flex flex-col items-center bg-primary/8 rounded-xl p-2">
                     <div className="flex items-center gap-1 mb-0.5">
-                      <Clock size={10} className="text-muted-foreground" />
-                      <span className="text-xs font-bold text-foreground tabular-nums">{formatVND(vehicle.pricePerMinute)}</span>
+                      <Clock size={10} className="text-primary" />
+                      <span className="text-xs font-bold text-primary tabular-nums">{formatVND(TRIP_BASE_FEE)}</span>
                     </div>
-                    <span className="text-[9px] text-muted-foreground">mỗi phút</span>
+                    <span className="text-[9px] text-muted-foreground">5 phút đầu</span>
                   </div>
                   <div className="flex flex-col items-center bg-muted rounded-xl p-2">
                     <div className="flex items-center gap-1 mb-0.5">
@@ -225,9 +237,9 @@ export default function VehicleListClient() {
                 <p className="text-sm font-bold text-foreground truncate">{selectedVehicle.model}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Giá</p>
+                <p className="text-xs text-muted-foreground">Giá khởi điểm</p>
                 <p className="text-sm font-bold text-primary tabular-nums">
-                  {formatVND(selectedVehicle.pricePerMinute)}/phút
+                  {formatVND(TRIP_BASE_FEE)} / 5 phút
                 </p>
               </div>
               <BatteryIndicator percent={selectedVehicle.batteryPercent} size="sm" />

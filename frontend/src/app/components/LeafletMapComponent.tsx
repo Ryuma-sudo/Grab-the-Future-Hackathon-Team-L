@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { calculateTripCost, formatVND as fmtVND } from '../../lib/mockData';
 
 export interface ApiStation {
   id: number;
@@ -189,9 +190,8 @@ function calcCostLabel(from: ApiStation, to: ApiStation): string {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const dur = Math.round(distKm * 4);
-  const cost = dur * 1500;
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(cost);
+  const durationMin = Math.round(distKm * 4); // ~15 km/h scooter → 4 min/km
+  return fmtVND(calculateTripCost(durationMin));
 }
 
 export default function LeafletMapComponent({

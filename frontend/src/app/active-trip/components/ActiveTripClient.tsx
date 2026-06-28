@@ -8,7 +8,7 @@ import TripStatsBar from './TripStatsBar';
 import EndTripModal from './EndTripModal';
 import TripTopBar from './TripTopBar';
 import NearbyStationSheet from './NearbyStationSheet';
-import { MOCK_STATIONS } from '../../../lib/mockData';
+import { MOCK_STATIONS, calculateTripCost } from '../../../lib/mockData';
 
 export interface TripState {
   startTime: number;
@@ -105,7 +105,7 @@ export default function ActiveTripClient({ fromStationId, toStationId }: ActiveT
     batteryPercent: 64,
     estimatedRangeKm: 38,
     vehicleModel: 'VinFast Feliz S',
-    pricePerMinute: 1500,
+    pricePerMinute: 1000,
     tripId: 'TR-20260628',
     showLowBatteryAlert: false,
     showNearbyStations: false,
@@ -163,7 +163,7 @@ export default function ActiveTripClient({ fromStationId, toStationId }: ActiveT
         const newElapsed = prev.elapsedSeconds + 1;
         // Simulate 30 km/h for visible demo progress (vs realistic 12)
         const newDistanceKm = Math.round((newElapsed / 3600) * 30 * 100) / 100;
-        const newCost = Math.round((newElapsed / 60) * prev.pricePerMinute);
+        const newCost = calculateTripCost(newElapsed / 60);
         const newBattery = Math.max(0, prev.batteryPercent - (newDistanceKm - prev.distanceKm) * 0.3);
         const newBatteryRounded = Math.round(newBattery * 10) / 10;
         const newRange = Math.round(newBatteryRounded * 0.6 * 10) / 10;
