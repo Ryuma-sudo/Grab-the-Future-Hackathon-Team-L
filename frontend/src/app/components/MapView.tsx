@@ -508,7 +508,13 @@ export default function MapView() {
 
   const handleNoDestination = () => {
     if (!departureStation) return;
-    router.push(`/vehicle-selection-rental?from=${departureStation.id}`);
+    const walkMin = Math.max(1, Math.round(
+      calculateDistanceMeters(
+        { latitude: userPosition.latitude, longitude: userPosition.longitude },
+        { latitude: departureStation.latitude, longitude: departureStation.longitude },
+      ) / 80,
+    ));
+    router.push(`/vehicle-selection-rental?from=${departureStation.id}&walkMin=${walkMin}`);
   };
 
   const handleChooseDestination = () => {
@@ -531,12 +537,30 @@ export default function MapView() {
 
   const handleConfirmDestination = () => {
     if (!departureStation || !destinationStation) return;
-    router.push(`/vehicle-selection-rental?from=${departureStation.id}&to=${destinationStation.id}`);
+    const estimate = destinationEstimates.find((e) => e.station.id === destinationStation.id);
+    const distParam = estimate ? `&dist=${estimate.distanceKm}` : '';
+    const walkMin = Math.max(1, Math.round(
+      calculateDistanceMeters(
+        { latitude: userPosition.latitude, longitude: userPosition.longitude },
+        { latitude: departureStation.latitude, longitude: departureStation.longitude },
+      ) / 80,
+    ));
+    router.push(`/vehicle-selection-rental?from=${departureStation.id}&to=${destinationStation.id}${distParam}&walkMin=${walkMin}`);
   };
 
   const handleConfirmRecommendation = () => {
     if (!departureStation || !destinationStation) return;
-    router.push(`/vehicle-selection-rental?from=${departureStation.id}&to=${destinationStation.id}`);
+    const distKm = Math.round(calculateDistanceMeters(
+      { latitude: departureStation.latitude, longitude: departureStation.longitude },
+      { latitude: destinationStation.latitude, longitude: destinationStation.longitude },
+    ) / 100) / 10;
+    const walkMin = Math.max(1, Math.round(
+      calculateDistanceMeters(
+        { latitude: userPosition.latitude, longitude: userPosition.longitude },
+        { latitude: departureStation.latitude, longitude: departureStation.longitude },
+      ) / 80,
+    ));
+    router.push(`/vehicle-selection-rental?from=${departureStation.id}&to=${destinationStation.id}&dist=${distKm}&walkMin=${walkMin}`);
   };
 
   const handlePickUserLocation = () => {

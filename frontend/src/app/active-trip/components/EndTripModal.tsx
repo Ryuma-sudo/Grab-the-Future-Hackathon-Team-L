@@ -14,7 +14,7 @@ interface EndTripModalProps {
 function formatElapsed(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  return `${minutes} min ${remainingSeconds}s`;
+  return `${minutes} phút ${remainingSeconds}s`;
 }
 
 export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModalProps) {
@@ -24,9 +24,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
 
   const handleConfirm = () => {
     setConfirming(true);
-    setTimeout(() => {
-      onConfirm();
-    }, 600);
+    setTimeout(() => { onConfirm(); }, 600);
   };
 
   return (
@@ -40,8 +38,8 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                 <CheckCircle size={16} className="text-primary" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-foreground">Trip completed</h2>
-                <p className="text-[10px] text-muted-foreground">Simulation reached destination</p>
+                <h2 className="text-sm font-bold text-foreground">Kết thúc chuyến đi</h2>
+                <p className="text-[10px] text-muted-foreground">Xe đã về đến trạm đích</p>
               </div>
             </div>
             <button
@@ -54,15 +52,16 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
         </div>
 
         <div className="px-5 py-4 overflow-y-auto max-h-[70vh]">
+          {/* Trip summary */}
           <div className="bg-secondary/40 rounded-2xl p-4 mb-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Trip summary</p>
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-3">Tóm tắt chuyến đi</p>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 bg-card rounded-xl flex items-center justify-center">
                   <Clock size={14} className="text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Time</p>
+                  <p className="text-[10px] text-muted-foreground">Thời gian</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{formatElapsed(trip.elapsedSeconds)}</p>
                 </div>
               </div>
@@ -71,7 +70,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                   <Route size={14} className="text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Distance</p>
+                  <p className="text-[10px] text-muted-foreground">Quãng đường</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{trip.distanceKm.toFixed(1)} km</p>
                 </div>
               </div>
@@ -80,7 +79,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                   <Zap size={14} className="text-muted-foreground" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Battery left</p>
+                  <p className="text-[10px] text-muted-foreground">Pin còn lại</p>
                   <p className="text-sm font-bold text-foreground tabular-nums">{trip.batteryPercent.toFixed(0)}%</p>
                 </div>
               </div>
@@ -89,26 +88,28 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                   <Wallet size={14} className="text-primary" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Cost</p>
+                  <p className="text-[10px] text-muted-foreground">Chi phí</p>
                   <p className="text-sm font-bold text-primary tabular-nums">{formatVND(trip.currentCost)}</p>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Destination station */}
           <div className="flex items-center gap-3 p-3 bg-muted rounded-2xl mb-4">
             <div className="w-9 h-9 bg-secondary rounded-xl flex items-center justify-center">
               <MapPin size={16} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-foreground">{trip.destinationStationName}</p>
-              <p className="text-[10px] text-muted-foreground">Destination station</p>
+              <p className="text-[10px] text-muted-foreground">Trạm trả xe</p>
             </div>
-            <span className="text-[10px] font-bold text-primary bg-secondary px-2 py-1 rounded-full">Return</span>
+            <span className="text-[10px] font-bold text-primary bg-secondary px-2 py-1 rounded-full">Trả xe</span>
           </div>
 
+          {/* Rating */}
           <div className="mb-4">
-            <p className="text-xs font-bold text-foreground mb-2">Rate this simulation</p>
+            <p className="text-xs font-bold text-foreground mb-2">Đánh giá chuyến đi</p>
             <div className="flex items-center gap-2 justify-center py-2">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -139,12 +140,12 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
             {confirming ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Closing...
+                Đang xử lý...
               </>
             ) : (
               <>
                 <CheckCircle size={16} />
-                Confirm return
+                Xác nhận trả xe
               </>
             )}
           </button>
@@ -153,7 +154,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
             onClick={onCancel}
             className="w-full py-3 mt-2 text-muted-foreground text-sm font-medium active:scale-[0.98] transition-all duration-150"
           >
-            Continue viewing
+            Tiếp tục xem
           </button>
         </div>
       </div>

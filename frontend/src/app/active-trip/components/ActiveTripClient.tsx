@@ -38,7 +38,8 @@ export interface TripState {
   routeCoordinates: CoordinatePayload[];
 }
 
-const SIMULATION_DURATION_MS = 5000;
+// Demo simulation: trip completes in 8 seconds so judges can see the full flow
+const SIMULATION_DURATION_MS = 8000;
 
 function buildInitialTrip(
   vehicle: ApiVehicle,
@@ -51,10 +52,7 @@ function buildInitialTrip(
     longitude: startStation.longitude,
   };
   const destinationCoordinate = destinationStation
-    ? {
-        latitude: destinationStation.latitude,
-        longitude: destinationStation.longitude,
-      }
+    ? { latitude: destinationStation.latitude, longitude: destinationStation.longitude }
     : routeCoordinates[routeCoordinates.length - 1] ?? startCoordinate;
 
   return {
@@ -66,21 +64,25 @@ function buildInitialTrip(
     estimatedRangeKm: vehicle.estimated_range_km,
     vehicleModel: vehicle.code,
     pricePerMinute: 1000,
-    tripId: `SIM-${Date.now().toString().slice(-6)}`,
+    tripId: `TR-${Date.now().toString().slice(-6)}`,
     showLowBatteryAlert: vehicle.battery_level <= 5,
     showNearbyStations: false,
     startStationName: startStation.name,
-    destinationStationName: destinationStation?.name ?? 'Free ride destination',
+    destinationStationName: destinationStation?.name ?? 'Điểm đến tự do',
     progress: 0,
     startCoordinate,
     destinationCoordinate,
-    routeCoordinates: routeCoordinates.length > 1 ? routeCoordinates : [startCoordinate, destinationCoordinate],
+    routeCoordinates: routeCoordinates.length > 1
+      ? routeCoordinates
+      : [startCoordinate, destinationCoordinate],
   };
 }
 
-function getTripDistanceKm(startStation: ApiStation, destinationStation: ApiStation | null) {
+function getTripDistanceKm(
+  startStation: ApiStation,
+  destinationStation: ApiStation | null,
+): number {
   if (!destinationStation) return 1;
-
   return (
     calculateDistanceMeters(
       { latitude: startStation.latitude, longitude: startStation.longitude },
@@ -95,25 +97,26 @@ export default function ActiveTripClient() {
   const startStationId = Number(searchParams.get('from'));
   const destinationStationId = searchParams.get('to') ? Number(searchParams.get('to')) : null;
   const vehicleId = Number(searchParams.get('vehicle'));
+
   const [showEndModal, setShowEndModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trip, setTrip] = useState<TripState | null>(null);
+
   const distanceRef = useRef(1);
   const batteryBeforeRef = useRef(100);
   const rangeRef = useRef(45);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoEndedRef = useRef(false);
 
-  function fallbackRouteCoordinates(startStation: ApiStation, destinationStation: ApiStation | null) {
+  function fallbackRoute(
+    startStation: ApiStation,
+    destinationStation: ApiStation | null,
+  ): CoordinatePayload[] {
     const start = { latitude: startStation.latitude, longitude: startStation.longitude };
     const destination = destinationStation
       ? { latitude: destinationStation.latitude, longitude: destinationStation.longitude }
-      : {
-          latitude: startStation.latitude + 0.006,
-          longitude: startStation.longitude + 0.004,
-        };
-
+      : { latitude: startStation.latitude + 0.006, longitude: startStation.longitude + 0.004 };
     return [start, destination];
   }
 
@@ -125,7 +128,7 @@ export default function ActiveTripClient() {
     if (!destinationStation) {
       return {
         distanceKm: getTripDistanceKm(startStation, null),
-        coordinates: fallbackRouteCoordinates(startStation, null),
+        coordinates: fallbackRoute(startStation, null),
       };
     }
 
@@ -140,25 +143,24 @@ export default function ActiveTripClient() {
       if (route.status === 'ok' && route.geometry?.coordinates?.length) {
         return {
           distanceKm: route.distance_km ?? getTripDistanceKm(startStation, destinationStation),
-          coordinates: route.geometry.coordinates.map(([longitude, latitude]) => ({
+          coordinates: route.geometry.coordinates.map(([longitude, latitude]: [number, number]) => ({
             latitude,
             longitude,
           })),
         };
       }
-    } catch {
-      // Simulation can still run with a direct fallback if routing is unavailable.
-    }
+    } catch { /* fallback below */ }
 
     return {
       distanceKm: getTripDistanceKm(startStation, destinationStation),
-      coordinates: fallbackRouteCoordinates(startStation, destinationStation),
+      coordinates: fallbackRoute(startStation, destinationStation),
     };
   }
 
+  // ── Load station + vehicle data, then build simulation ──────────────────────
   useEffect(() => {
     if (!startStationId || !vehicleId) {
-      setError('Missing station or vehicle for simulation');
+      setError('Thiếu thông tin trạm hoặc xe để bắt đầu chuyến đi');
       setLoading(false);
       return;
     }
@@ -185,7 +187,7 @@ export default function ActiveTripClient() {
         setTrip(buildInitialTrip(vehicle, startStation, destinationStation, route.coordinates));
       } catch (err) {
         if (isActive) {
-          setError(err instanceof Error ? err.message : 'Cannot start simulation');
+          setError(err instanceof Error ? err.message : 'Không thể bắt đầu chuyến đi');
         }
       } finally {
         if (isActive) setLoading(false);
@@ -193,12 +195,10 @@ export default function ActiveTripClient() {
     }
 
     loadSimulationData();
+    return () => { isActive = false; };
+  }, [startStationId, destinationStationId, vehicleId]); // eslint-disable-line
 
-    return () => {
-      isActive = false;
-    };
-  }, [startStationId, destinationStationId, vehicleId]);
-
+  // ── Simulation timer — runs after data is loaded ─────────────────────────────
   useEffect(() => {
     if (!trip || loading || error) return;
 
@@ -209,20 +209,23 @@ export default function ActiveTripClient() {
       const elapsedSeconds = Math.ceil(elapsedMs / 1000);
       const distanceKm = Math.round(distanceRef.current * progress * 10) / 10;
       const batteryUsed = (distanceRef.current / rangeRef.current) * 100 * progress;
-      const batteryPercent = Math.max(0, Math.round((batteryBeforeRef.current - batteryUsed) * 10) / 10);
+      const batteryPercent = Math.max(
+        0,
+        Math.round((batteryBeforeRef.current - batteryUsed) * 10) / 10,
+      );
       const estimatedRangeKm = Math.round(rangeRef.current * (batteryPercent / 100) * 10) / 10;
 
-      setTrip((previous) => {
-        if (!previous) return previous;
+      setTrip((prev) => {
+        if (!prev) return prev;
         return {
-          ...previous,
+          ...prev,
           elapsedSeconds,
           distanceKm,
           currentCost: estimateTripCost(Math.max(1, elapsedSeconds / 60)),
           batteryPercent,
           estimatedRangeKm,
           showLowBatteryAlert: batteryPercent <= 5,
-          showNearbyStations: previous.showNearbyStations || batteryPercent <= 5,
+          showNearbyStations: prev.showNearbyStations || batteryPercent <= 5,
           progress,
         };
       });
@@ -236,26 +239,21 @@ export default function ActiveTripClient() {
       }
     }, 100);
 
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [trip?.tripId, loading, error]);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [trip?.tripId, loading, error]); // eslint-disable-line
 
   const handleEndTrip = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowEndModal(true);
   };
 
-  const handleConfirmEnd = () => {
-    router.push('/');
-  };
-
+  // ── Loading / error states ───────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="relative flex flex-col h-screen bg-background overflow-hidden items-center justify-center">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 size={18} className="animate-spin text-primary" />
-          <span className="text-sm font-semibold">Preparing simulation...</span>
+          <span className="text-sm font-semibold">Đang khởi động chuyến đi...</span>
         </div>
       </div>
     );
@@ -266,7 +264,7 @@ export default function ActiveTripClient() {
       <div className="relative flex flex-col h-screen bg-background overflow-hidden items-center justify-center px-6 text-center">
         <div className="rounded-2xl bg-card border border-danger/30 p-5 shadow-card">
           <AlertTriangle size={24} className="text-danger mx-auto mb-2" />
-          <p className="text-sm font-bold text-foreground">Cannot start trip simulation</p>
+          <p className="text-sm font-bold text-foreground">Không thể bắt đầu chuyến đi</p>
           <p className="text-xs text-muted-foreground mt-1">{error}</p>
         </div>
       </div>
@@ -279,7 +277,9 @@ export default function ActiveTripClient() {
         <LowBatteryAlert
           batteryPercent={trip.batteryPercent}
           rangeKm={trip.estimatedRangeKm}
-          onViewStations={() => setTrip((previous) => previous ? { ...previous, showNearbyStations: true } : previous)}
+          onViewStations={() =>
+            setTrip((prev) => prev ? { ...prev, showNearbyStations: true } : prev)
+          }
         />
       )}
 
@@ -304,14 +304,14 @@ export default function ActiveTripClient() {
 
       {trip.showNearbyStations && (
         <NearbyStationSheet
-          onClose={() => setTrip((previous) => previous ? { ...previous, showNearbyStations: false } : previous)}
+          onClose={() => setTrip((prev) => prev ? { ...prev, showNearbyStations: false } : prev)}
         />
       )}
 
       {showEndModal && (
         <EndTripModal
           trip={trip}
-          onConfirm={handleConfirmEnd}
+          onConfirm={() => router.push('/')}
           onCancel={() => setShowEndModal(false)}
         />
       )}
