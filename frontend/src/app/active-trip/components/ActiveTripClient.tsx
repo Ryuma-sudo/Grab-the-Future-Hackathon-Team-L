@@ -34,6 +34,7 @@ interface ApiStation {
 interface ActiveTripClientProps {
   fromStationId?: string;
   toStationId?: string;
+  vehicleModel?: string;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -85,7 +86,7 @@ function interpolate(
   return pts[pts.length - 1];
 }
 
-export default function ActiveTripClient({ fromStationId, toStationId }: ActiveTripClientProps) {
+export default function ActiveTripClient({ fromStationId, toStationId, vehicleModel }: ActiveTripClientProps) {
   const router = useRouter();
   const [showEndModal, setShowEndModal] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -104,7 +105,7 @@ export default function ActiveTripClient({ fromStationId, toStationId }: ActiveT
     currentCost: 0,
     batteryPercent: 64,
     estimatedRangeKm: 38,
-    vehicleModel: 'VinFast Feliz S',
+    vehicleModel: vehicleModel ?? 'Yadea G5',
     pricePerMinute: 1000,
     tripId: 'TR-20260628',
     showLowBatteryAlert: false,

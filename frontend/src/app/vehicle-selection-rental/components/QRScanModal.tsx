@@ -35,6 +35,7 @@ export default function QRScanModal({ vehicle, fromId, toId, onClose }: QRScanMo
       const params = new URLSearchParams();
       if (fromId) params.set('from', fromId);
       if (toId) params.set('to', toId);
+      params.set('vehicle', vehicle.model);
       const qs = params.toString();
       router.push(`/active-trip${qs ? `?${qs}` : ''}`);
       return;

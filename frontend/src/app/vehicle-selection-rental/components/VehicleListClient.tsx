@@ -15,14 +15,16 @@ export default function VehicleListClient() {
   const toId = searchParams.get('to');
   const distParam = searchParams.get('dist');
   const distanceKm = distParam ? parseFloat(distParam) : null;
-  const walkMin = searchParams.get('walkMin') ? parseInt(searchParams.get('walkMin')!, 10) : null;
+
+  // Map numeric fromId → mock stationId string
+  const stationMockId = fromId ? `station-${String(parseInt(fromId, 10)).padStart(3, '0')}` : 'station-001';
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [sortBy, setSortBy] = useState<'battery' | 'price'>('battery');
 
   const stationVehicles = MOCK_VEHICLES.filter(
-    (v) => v.stationId === 'station-001' && v.type === 'scooter'
+    (v) => v.stationId === stationMockId && v.status === 'available'
   );
 
   const filtered = [...stationVehicles].sort((a, b) =>
@@ -66,22 +68,12 @@ export default function VehicleListClient() {
           </button>
         </div>
 
-        {/* Context info strip */}
-        {(distanceKm !== null || walkMin !== null) && (
-          <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
-            {walkMin !== null && (
-              <span className="flex items-center gap-1">
-                <Clock size={10} className="text-primary" />
-                Đi bộ đến trạm: <span className="font-bold text-foreground">{walkMin} phút</span>
-              </span>
-            )}
-            {distanceKm !== null && (
-              <span className="flex items-center gap-1">
-                <Route size={10} className="text-primary" />
-                Tới đích: <span className="font-bold text-foreground">{distanceKm} km</span>
-                {' '}— xe mờ không đủ pin
-              </span>
-            )}
+        {/* Distance to destination context */}
+        {distanceKm !== null && (
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <Route size={10} className="text-primary" />
+            Tới đích: <span className="font-bold text-foreground">{distanceKm} km</span>
+            {' '}— xe mờ không đủ pin để đến nơi
           </div>
         )}
       </div>
