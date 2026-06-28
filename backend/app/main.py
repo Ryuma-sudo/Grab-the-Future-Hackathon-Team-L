@@ -1,8 +1,10 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Base, engine
-from app.models import station, user, vehicle
+from app.models import station, trip, user, vehicle
 from app.routers import station as station_router
+from app.routers import trip as trip_router
 from app.routers import user as user_router
 from app.routers import vehicle as vehicle_router
 from app.routers import routing as ai_router
@@ -16,9 +18,21 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:4028",
+        "http://127.0.0.1:4028",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(user_router.router)
 app.include_router(vehicle_router.router)
 app.include_router(station_router.router)
+app.include_router(trip_router.router)
 app.include_router(ai_router.router)
 
 
