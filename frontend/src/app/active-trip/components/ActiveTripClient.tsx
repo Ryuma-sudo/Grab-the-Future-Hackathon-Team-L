@@ -64,7 +64,7 @@ function buildInitialTrip(
     currentCost: 0,
     batteryPercent: vehicle.battery_level,
     estimatedRangeKm: vehicle.estimated_range_km,
-    vehicleModel: `EV Scooter ${vehicle.code}`,
+    vehicleModel: vehicle.code,
     pricePerMinute: 1000,
     tripId: `SIM-${Date.now().toString().slice(-6)}`,
     showLowBatteryAlert: vehicle.battery_level <= 5,

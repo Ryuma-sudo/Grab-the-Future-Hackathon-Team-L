@@ -10,7 +10,7 @@ import type { ApiVehicle } from '../../../lib/api';
 import QRScanModal from './QRScanModal';
 
 function getVehicleLabel(vehicle: ApiVehicle) {
-  return `EV Scooter ${vehicle.code}`;
+  return vehicle.code;
 }
 
 function getStatusLabel(status: ApiVehicle['status']) {
