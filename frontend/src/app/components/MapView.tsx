@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Navigation, Zap, MapPin, X, ChevronRight, ArrowRight, Clock, Route } from 'lucide-react';
+import { Navigation, Zap, MapPin, X, ChevronRight, ArrowRight, Clock, Route, Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ApiStation, FlowStep } from './LeafletMapComponent';
 import { MOCK_STATIONS } from '../../lib/mockData';
@@ -18,7 +18,6 @@ interface RouteInfo {
   estimatedCost: number;
 }
 
-// Convert MOCK_STATIONS to ApiStation format for offline fallback
 const FALLBACK_STATIONS: ApiStation[] = MOCK_STATIONS.map((s, i) => ({
   id: i + 1,
   name: s.name,
@@ -60,8 +59,6 @@ async function fetchOsrmRoute(
   const data = await res.json();
   const route = data.routes?.[0];
   if (!route) throw new Error('No route');
-
-  // OSRM returns [lng, lat] — convert to Leaflet [lat, lng]
   const points: [number, number][] = (route.geometry.coordinates as [number, number][]).map(
     ([lng, lat]) => [lat, lng],
   );
@@ -72,6 +69,8 @@ async function fetchOsrmRoute(
 
 export default function MapView() {
   const router = useRouter();
+  const searchRef = useRef<HTMLDivElement>(null);
+
   const [stations, setStations] = useState<ApiStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState<FlowStep>('idle');
@@ -84,6 +83,12 @@ export default function MapView() {
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [focusPosition, setFocusPosition] = useState<[number, number] | null>(null);
+  const [focusTrigger, setFocusTrigger] = useState(0);
 
   useEffect(() => {
     fetch(`${API_BASE}/stations`)
@@ -105,7 +110,26 @@ export default function MapView() {
     );
   }, []);
 
-  // Walk minutes from user → selected departure station
+  // Close search dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Search results — filter stations by name/address
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return stations
+      .filter((s) => s.name.toLowerCase().includes(q) || s.address.toLowerCase().includes(q))
+      .slice(0, 5);
+  }, [stations, searchQuery]);
+
   const departureWalkMinutes = useMemo(() => {
     if (!departureStation) return null;
     if (userPosition) {
@@ -121,7 +145,6 @@ export default function MapView() {
   const handleStationClick = useCallback(
     async (station: ApiStation) => {
       if (step === 'picking-destination' && departureStation) {
-        // Show route preview instead of navigating immediately
         setDestinationStation(station);
         setStep('route-preview');
         setRouteLoading(true);
@@ -131,11 +154,8 @@ export default function MapView() {
         try {
           const { points, distanceKm, durationMin } = await fetchOsrmRoute(departureStation, station);
           setRoutePoints(points);
-          // Estimate cost: duration by electric scooter (price per minute)
-          const estimatedCost = durationMin * 1500;
-          setRouteInfo({ distanceKm, durationMin, estimatedCost });
+          setRouteInfo({ distanceKm, durationMin, estimatedCost: durationMin * 1500 });
         } catch {
-          // Fallback to straight-line estimate
           const meters = haversineMeters(
             departureStation.latitude, departureStation.longitude,
             station.latitude, station.longitude,
@@ -153,7 +173,7 @@ export default function MapView() {
         return;
       }
 
-      if (step === 'route-preview') return; // map locked during preview
+      if (step === 'route-preview') return;
 
       if (departureStation?.id === station.id && step === 'departure-selected') {
         setDepartureStation(null);
@@ -165,6 +185,21 @@ export default function MapView() {
       setStep('departure-selected');
     },
     [step, departureStation],
+  );
+
+  // Handle search result click — fly to station + select it
+  const handleSearchSelect = useCallback(
+    (station: ApiStation) => {
+      setSearchQuery('');
+      setSearchOpen(false);
+      setFocusPosition([station.latitude, station.longitude]);
+      setFocusTrigger((t) => t + 1);
+      // Only auto-select if idle (don't override an already-selected departure)
+      if (step === 'idle') {
+        handleStationClick(station);
+      }
+    },
+    [step, handleStationClick],
   );
 
   const handleChooseDeparture = () => setStep('choose-destination-prompt');
@@ -207,10 +242,13 @@ export default function MapView() {
     );
   };
 
+  const showSearch = step === 'idle' || step === 'departure-selected';
+
   return (
     <div className="flex-1 relative overflow-hidden" style={{ minHeight: '100vh' }}>
-      {/* Leaflet Map */}
-      <div className="absolute inset-0">
+
+      {/* ── Map layer — z-0 creates stacking context, contains Leaflet z-indexes ── */}
+      <div className="absolute inset-0 z-0">
         {!loading && (
           <LeafletMap
             stations={stations}
@@ -222,6 +260,8 @@ export default function MapView() {
             recenterTrigger={recenterTrigger}
             routePoints={routePoints}
             routeLoading={routeLoading}
+            focusPosition={focusPosition}
+            focusTrigger={focusTrigger}
           />
         )}
         {loading && (
@@ -230,6 +270,81 @@ export default function MapView() {
           </div>
         )}
       </div>
+
+      {/* ── Search bar ─────────────────────────────────────────────────────────── */}
+      {showSearch && (
+        <div ref={searchRef} className="absolute top-4 left-4 right-4 z-[1001]">
+          <div className="bg-card rounded-2xl shadow-card-lg border border-border overflow-hidden">
+            {/* Input row */}
+            <div className="flex items-center gap-2 px-3 py-3">
+              <Search size={16} className="text-muted-foreground flex-shrink-0" />
+              <input
+                type="text"
+                placeholder="Tìm trạm xe gần đây..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                className="flex-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground text-foreground"
+              />
+              {searchQuery ? (
+                <button
+                  onClick={() => { setSearchQuery(''); setSearchOpen(false); }}
+                  className="p-1 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <X size={14} className="text-muted-foreground" />
+                </button>
+              ) : (
+                <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MapPin size={11} className="text-primary" />
+                </div>
+              )}
+            </div>
+
+            {/* Results dropdown */}
+            {searchOpen && searchResults.length > 0 && (
+              <div className="border-t border-border">
+                {searchResults.map((station, idx) => (
+                  <button
+                    key={station.id}
+                    onMouseDown={(e) => e.preventDefault()} // keep focus on input
+                    onClick={() => handleSearchSelect(station)}
+                    className={`w-full px-3 py-2.5 flex items-center gap-2.5 hover:bg-muted active:bg-muted/70 transition-colors text-left ${
+                      idx === searchResults.length - 1 ? 'rounded-b-2xl' : ''
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Zap size={13} className="text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-foreground truncate">{station.name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {station.address} &bull; {station.available_vehicle_count} xe có sẵn
+                      </p>
+                    </div>
+                    <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${
+                      station.available_vehicle_count > 0
+                        ? 'bg-primary/10 text-primary'
+                        : 'bg-muted text-muted-foreground'
+                    }`}>
+                      {station.available_vehicle_count > 0 ? `${station.available_vehicle_count} xe` : 'Hết xe'}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* No results */}
+            {searchOpen && searchQuery.trim() && searchResults.length === 0 && (
+              <div className="border-t border-border px-4 py-3 rounded-b-2xl">
+                <p className="text-xs text-muted-foreground text-center">Không tìm thấy trạm phù hợp</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── DEPARTURE SELECTED card ── */}
       {step === 'departure-selected' && departureStation && (
@@ -338,7 +453,7 @@ export default function MapView() {
 
       {/* ── PICKING DESTINATION banner ── */}
       {step === 'picking-destination' && departureStation && (
-        <div className="absolute top-16 left-4 right-4 z-[1000] fade-in-up">
+        <div className="absolute top-4 left-4 right-4 z-[1000] fade-in-up">
           <div className="bg-card rounded-2xl shadow-card-lg p-3 border-2 border-primary/30 flex items-center gap-3">
             <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0">
               <MapPin size={16} className="text-primary" />
@@ -361,7 +476,6 @@ export default function MapView() {
       {step === 'route-preview' && departureStation && destinationStation && (
         <div className="absolute bottom-24 left-4 right-4 z-[1000] fade-in-up">
           <div className="bg-card rounded-2xl shadow-card-lg border border-border overflow-hidden">
-            {/* Route header */}
             <div className="px-4 pt-3 pb-2 border-b border-border">
               <div className="flex items-center gap-2">
                 <div className="flex-1 min-w-0">
@@ -376,7 +490,6 @@ export default function MapView() {
               </div>
             </div>
 
-            {/* Route stats */}
             <div className="px-4 py-3">
               {routeLoading ? (
                 <div className="flex items-center justify-center gap-2 py-1">
@@ -431,7 +544,7 @@ export default function MapView() {
         </div>
       )}
 
-      {/* My location button — hidden during route preview to avoid confusion */}
+      {/* My location button */}
       {step !== 'route-preview' && (
         <button
           onClick={handleRecenter}
