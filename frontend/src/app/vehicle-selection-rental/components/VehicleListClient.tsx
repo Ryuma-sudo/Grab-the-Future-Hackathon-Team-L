@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MOCK_VEHICLES, formatVND } from '../../../lib/mockData';
 import type { Vehicle } from '../../../lib/mockData';
 import { Zap, Battery, Route, Clock, AlertTriangle } from 'lucide-react';
@@ -9,6 +10,10 @@ import StatusBadge from '../../../components/ui/StatusBadge';
 import QRScanModal from './QRScanModal';
 
 export default function VehicleListClient() {
+  const searchParams = useSearchParams();
+  const fromId = searchParams.get('from');
+  const toId = searchParams.get('to');
+
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showQR, setShowQR] = useState(false);
   const [sortBy, setSortBy] = useState<'battery' | 'price'>('battery');
@@ -211,7 +216,12 @@ export default function VehicleListClient() {
       )}
 
       {showQR && selectedVehicle && (
-        <QRScanModal vehicle={selectedVehicle} onClose={() => setShowQR(false)} />
+        <QRScanModal
+          vehicle={selectedVehicle}
+          fromId={fromId}
+          toId={toId}
+          onClose={() => setShowQR(false)}
+        />
       )}
     </div>
   );
