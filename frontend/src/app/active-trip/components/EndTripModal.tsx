@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle, X, Star, MapPin, Clock, Route, Wallet, Zap } from 'lucide-react';
+import { CheckCircle, Clock, MapPin, Route, Star, Wallet, X, Zap } from 'lucide-react';
 import type { TripState } from './ActiveTripClient';
-import { formatVND } from '../../../lib/mockData';
+import { formatVND } from '../../../lib/api';
 
 interface EndTripModalProps {
   trip: TripState;
@@ -12,13 +12,9 @@ interface EndTripModalProps {
 }
 
 function formatElapsed(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) {
-    return `${h} giờ ${m} phút ${s} giây`;
-  }
-  return `${m} phút ${s} giây`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes} phút ${remainingSeconds}s`;
 }
 
 export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModalProps) {
@@ -28,15 +24,12 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
 
   const handleConfirm = () => {
     setConfirming(true);
-    setTimeout(() => {
-      onConfirm();
-    }, 1000);
+    setTimeout(() => { onConfirm(); }, 600);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm">
       <div className="w-full max-w-lg bg-card rounded-t-3xl shadow-bottom-sheet fade-in-up overflow-hidden">
-        {/* Header */}
         <div className="flex flex-col items-center pt-4 pb-3 border-b border-border px-5">
           <div className="w-10 h-1 bg-muted-foreground/20 rounded-full mb-3" />
           <div className="flex items-center justify-between w-full">
@@ -46,7 +39,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
               </div>
               <div>
                 <h2 className="text-sm font-bold text-foreground">Kết thúc chuyến đi</h2>
-                <p className="text-[10px] text-muted-foreground">Xác nhận trả xe tại trạm</p>
+                <p className="text-[10px] text-muted-foreground">Xe đã về đến trạm đích</p>
               </div>
             </div>
             <button
@@ -95,23 +88,23 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                   <Wallet size={14} className="text-primary" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-muted-foreground">Tổng chi phí</p>
+                  <p className="text-[10px] text-muted-foreground">Chi phí</p>
                   <p className="text-sm font-bold text-primary tabular-nums">{formatVND(trip.currentCost)}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Return station */}
+          {/* Destination station */}
           <div className="flex items-center gap-3 p-3 bg-muted rounded-2xl mb-4">
             <div className="w-9 h-9 bg-secondary rounded-xl flex items-center justify-center">
               <MapPin size={16} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-foreground">Trạm Hồ Hoàn Kiếm</p>
-              <p className="text-[10px] text-muted-foreground">12 Đinh Tiên Hoàng, Hoàn Kiếm</p>
+              <p className="text-xs font-bold text-foreground">{trip.destinationStationName}</p>
+              <p className="text-[10px] text-muted-foreground">Trạm trả xe</p>
             </div>
-            <span className="text-[10px] font-bold text-primary bg-secondary px-2 py-1 rounded-full">Điểm trả</span>
+            <span className="text-[10px] font-bold text-primary bg-secondary px-2 py-1 rounded-full">Trả xe</span>
           </div>
 
           {/* Rating */}
@@ -130,20 +123,15 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
                     size={28}
                     className={`transition-colors duration-100 ${
                       star <= (hoverRating || rating)
-                        ? 'text-accent fill-accent' :'text-muted-foreground'
+                        ? 'text-accent fill-accent'
+                        : 'text-muted-foreground'
                     }`}
                   />
                 </button>
               ))}
             </div>
-            {rating > 0 && (
-              <p className="text-center text-xs text-muted-foreground mt-1">
-                {['', 'Rất tệ', 'Tệ', 'Bình thường', 'Tốt', 'Tuyệt vời!'][rating]}
-              </p>
-            )}
           </div>
 
-          {/* Confirm button */}
           <button
             onClick={handleConfirm}
             disabled={confirming}
@@ -166,7 +154,7 @@ export default function EndTripModal({ trip, onConfirm, onCancel }: EndTripModal
             onClick={onCancel}
             className="w-full py-3 mt-2 text-muted-foreground text-sm font-medium active:scale-[0.98] transition-all duration-150"
           >
-            Tiếp tục chuyến đi
+            Tiếp tục xem
           </button>
         </div>
       </div>

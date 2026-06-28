@@ -98,8 +98,24 @@ http://127.0.0.1:4028
 ### Run With Docker
 
 ```powershell
-cd backend
-docker compose up --build
+.\scripts\docker-up.ps1
+```
+
+This starts:
+
+- Backend API: `http://localhost:8000`
+- Frontend app: `http://localhost:4028`
+
+Stop both containers:
+
+```powershell
+.\scripts\docker-down.ps1
+```
+
+Equivalent Docker Compose command:
+
+```powershell
+docker compose -f backend/docker-compose.yml up --build
 ```
 
 ## User Guide

@@ -11,12 +11,9 @@ export default async function VehicleSelectionRentalPage({
 }) {
   const { from, walkMin } = await searchParams;
 
-  // Map numeric fromId → 'station-00X'
   const fromId = from ? parseInt(from, 10) : 1;
   const stationMockId = `station-${String(fromId).padStart(3, '0')}`;
   const station = MOCK_STATIONS.find((s) => s.id === stationMockId) ?? MOCK_STATIONS[0];
-
-  // Prefer URL walkMin (real Haversine from user pos) over mock default
   const walkMinutes = walkMin ? parseInt(walkMin, 10) : station.walkMinutes;
 
   return (

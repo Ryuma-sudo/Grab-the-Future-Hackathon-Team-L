@@ -1,14 +1,22 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import EndTripModal from './EndTripModal';
 import LowBatteryAlert from './LowBatteryAlert';
+import NearbyStationSheet from './NearbyStationSheet';
 import TripMapView from './TripMapView';
 import TripStatsBar from './TripStatsBar';
-import EndTripModal from './EndTripModal';
 import TripTopBar from './TripTopBar';
-import NearbyStationSheet from './NearbyStationSheet';
-import { MOCK_STATIONS, calculateTripCost } from '../../../lib/mockData';
+import {
+  calculateDistanceMeters,
+  estimateTripCost,
+  getRoute,
+  getStation,
+  getVehicle,
+} from '../../../lib/api';
+import type { ApiStation, ApiVehicle, CoordinatePayload } from '../../../lib/api';
 
 export interface TripState {
   startTime: number;
@@ -22,180 +30,246 @@ export interface TripState {
   tripId: string;
   showLowBatteryAlert: boolean;
   showNearbyStations: boolean;
+  startStationName: string;
+  destinationStationName: string;
+  progress: number;
+  startCoordinate: CoordinatePayload;
+  destinationCoordinate: CoordinatePayload;
+  routeCoordinates: CoordinatePayload[];
 }
 
-interface ApiStation {
-  id: number;
-  name: string;
-  latitude: number;
-  longitude: number;
-}
+// Demo simulation: trip completes in 8 seconds so judges can see the full flow
+const SIMULATION_DURATION_MS = 8000;
 
-interface ActiveTripClientProps {
-  fromStationId?: string;
-  toStationId?: string;
-  vehicleModel?: string;
-}
+function buildInitialTrip(
+  vehicle: ApiVehicle,
+  startStation: ApiStation,
+  destinationStation: ApiStation | null,
+  routeCoordinates: CoordinatePayload[],
+): TripState {
+  const startCoordinate = {
+    latitude: startStation.latitude,
+    longitude: startStation.longitude,
+  };
+  const destinationCoordinate = destinationStation
+    ? { latitude: destinationStation.latitude, longitude: destinationStation.longitude }
+    : routeCoordinates[routeCoordinates.length - 1] ?? startCoordinate;
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
-const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
-
-// Fallback stations lookup (index+1 = ID)
-const FALLBACK: ApiStation[] = MOCK_STATIONS.map((s, i) => ({
-  id: i + 1,
-  name: s.name,
-  latitude: s.lat,
-  longitude: s.lng,
-}));
-
-function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function buildCumulative(pts: [number, number][]): number[] {
-  const cum = [0];
-  for (let i = 1; i < pts.length; i++) {
-    const d = haversineMeters(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]);
-    cum.push(cum[i - 1] + d);
-  }
-  return cum;
-}
-
-function interpolate(
-  pts: [number, number][],
-  cum: number[],
-  fraction: number,
-): [number, number] {
-  const total = cum[cum.length - 1];
-  const target = Math.min(fraction * total, total);
-  for (let i = 1; i < pts.length; i++) {
-    if (cum[i] >= target) {
-      const seg = (target - cum[i - 1]) / (cum[i] - cum[i - 1]);
-      return [
-        pts[i - 1][0] + seg * (pts[i][0] - pts[i - 1][0]),
-        pts[i - 1][1] + seg * (pts[i][1] - pts[i - 1][1]),
-      ];
-    }
-  }
-  return pts[pts.length - 1];
-}
-
-export default function ActiveTripClient({ fromStationId, toStationId, vehicleModel }: ActiveTripClientProps) {
-  const router = useRouter();
-  const [showEndModal, setShowEndModal] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Route state (only when toStationId is set)
-  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
-  const [routeCumulative, setRouteCumulative] = useState<number[]>([]);
-  const [routeDistanceKm, setRouteDistanceKm] = useState<number>(0);
-  const [destinationPos, setDestinationPos] = useState<[number, number] | null>(null);
-  const [departurePos, setDeparturePos] = useState<[number, number] | null>(null);
-
-  const [trip, setTrip] = useState<TripState>({
+  return {
     startTime: Date.now(),
     elapsedSeconds: 0,
     distanceKm: 0,
     currentCost: 0,
-    batteryPercent: 64,
-    estimatedRangeKm: 38,
-    vehicleModel: vehicleModel ?? 'Yadea G5',
+    batteryPercent: vehicle.battery_level,
+    estimatedRangeKm: vehicle.estimated_range_km,
+    vehicleModel: vehicle.code,
     pricePerMinute: 1000,
-    tripId: 'TR-20260628',
-    showLowBatteryAlert: false,
+    tripId: `TR-${Date.now().toString().slice(-6)}`,
+    showLowBatteryAlert: vehicle.battery_level <= 5,
     showNearbyStations: false,
-  });
+    startStationName: startStation.name,
+    destinationStationName: destinationStation?.name ?? 'Điểm đến tự do',
+    progress: 0,
+    startCoordinate,
+    destinationCoordinate,
+    routeCoordinates: routeCoordinates.length > 1
+      ? routeCoordinates
+      : [startCoordinate, destinationCoordinate],
+  };
+}
 
-  // ── Fetch route if destination is set ──────────────────────────────────────
-  useEffect(() => {
-    if (!fromStationId || !toStationId) return;
+function getTripDistanceKm(
+  startStation: ApiStation,
+  destinationStation: ApiStation | null,
+): number {
+  if (!destinationStation) return 1;
+  return (
+    calculateDistanceMeters(
+      { latitude: startStation.latitude, longitude: startStation.longitude },
+      { latitude: destinationStation.latitude, longitude: destinationStation.longitude },
+    ) / 1000
+  );
+}
 
-    const load = async () => {
-      try {
-        // 1. Get stations (backend → fallback)
-        let stations: ApiStation[] = FALLBACK;
-        try {
-          const res = await fetch(`${API_BASE}/stations`);
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) stations = data;
-        } catch { /* use fallback */ }
+export default function ActiveTripClient() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const startStationId = Number(searchParams.get('from'));
+  const destinationStationId = searchParams.get('to') ? Number(searchParams.get('to')) : null;
+  const vehicleId = Number(searchParams.get('vehicle'));
 
-        const fromId = parseInt(fromStationId, 10);
-        const toId = parseInt(toStationId, 10);
-        const fromSt = stations.find((s) => s.id === fromId);
-        const toSt = stations.find((s) => s.id === toId);
-        if (!fromSt || !toSt) return;
+  const [showEndModal, setShowEndModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [trip, setTrip] = useState<TripState | null>(null);
 
-        setDeparturePos([fromSt.latitude, fromSt.longitude]);
-        setDestinationPos([toSt.latitude, toSt.longitude]);
+  const distanceRef = useRef(1);
+  const batteryBeforeRef = useRef(100);
+  const rangeRef = useRef(45);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoEndedRef = useRef(false);
 
-        // 2. Fetch OSRM route
-        const url = `${OSRM_BASE}/${fromSt.longitude},${fromSt.latitude};${toSt.longitude},${toSt.latitude}?overview=full&geometries=geojson`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const route = data.routes?.[0];
-        if (!route) return;
+  function fallbackRoute(
+    startStation: ApiStation,
+    destinationStation: ApiStation | null,
+  ): CoordinatePayload[] {
+    const start = { latitude: startStation.latitude, longitude: startStation.longitude };
+    const destination = destinationStation
+      ? { latitude: destinationStation.latitude, longitude: destinationStation.longitude }
+      : { latitude: startStation.latitude + 0.006, longitude: startStation.longitude + 0.004 };
+    return [start, destination];
+  }
 
-        const pts: [number, number][] = (route.geometry.coordinates as [number, number][]).map(
-          ([lng, lat]) => [lat, lng],
-        );
-        const cum = buildCumulative(pts);
-        const distKm = Math.round((route.distance / 1000) * 10) / 10;
+  async function getSimulationRoute(
+    startStation: ApiStation,
+    destinationStation: ApiStation | null,
+    vehicle: ApiVehicle,
+  ) {
+    if (!destinationStation) {
+      return {
+        distanceKm: getTripDistanceKm(startStation, null),
+        coordinates: fallbackRoute(startStation, null),
+      };
+    }
 
-        setRoutePoints(pts);
-        setRouteCumulative(cum);
-        setRouteDistanceKm(distKm);
-      } catch { /* silently ignore — no route shown */ }
+    try {
+      const route = await getRoute({
+        origin: { latitude: startStation.latitude, longitude: startStation.longitude },
+        destination: { latitude: destinationStation.latitude, longitude: destinationStation.longitude },
+        battery_level: vehicle.battery_level,
+        stations: [],
+      });
+
+      if (route.status === 'ok' && route.geometry?.coordinates?.length) {
+        return {
+          distanceKm: route.distance_km ?? getTripDistanceKm(startStation, destinationStation),
+          coordinates: route.geometry.coordinates.map(([longitude, latitude]: [number, number]) => ({
+            latitude,
+            longitude,
+          })),
+        };
+      }
+    } catch { /* fallback below */ }
+
+    return {
+      distanceKm: getTripDistanceKm(startStation, destinationStation),
+      coordinates: fallbackRoute(startStation, destinationStation),
     };
+  }
 
-    load();
-  }, [fromStationId, toStationId]);
-
-  // ── Realtime trip ticker ───────────────────────────────────────────────────
+  // ── Load station + vehicle data, then build simulation ──────────────────────
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setTrip((prev) => {
-        const newElapsed = prev.elapsedSeconds + 1;
-        // Simulate 30 km/h for visible demo progress (vs realistic 12)
-        const newDistanceKm = Math.round((newElapsed / 3600) * 30 * 100) / 100;
-        const newCost = calculateTripCost(newElapsed / 60);
-        const newBattery = Math.max(0, prev.batteryPercent - (newDistanceKm - prev.distanceKm) * 0.3);
-        const newBatteryRounded = Math.round(newBattery * 10) / 10;
-        const newRange = Math.round(newBatteryRounded * 0.6 * 10) / 10;
-        const showLowBattery = newBatteryRounded <= 5;
+    if (!startStationId || !vehicleId) {
+      setError('Thiếu thông tin trạm hoặc xe để bắt đầu chuyến đi');
+      setLoading(false);
+      return;
+    }
 
+    let isActive = true;
+
+    async function loadSimulationData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [startStation, destinationStation, vehicle] = await Promise.all([
+          getStation(startStationId),
+          destinationStationId ? getStation(destinationStationId) : Promise.resolve(null),
+          getVehicle(vehicleId),
+        ]);
+
+        if (!isActive) return;
+
+        const route = await getSimulationRoute(startStation, destinationStation, vehicle);
+        distanceRef.current = Math.max(0.2, route.distanceKm);
+        batteryBeforeRef.current = vehicle.battery_level;
+        rangeRef.current = Math.max(1, vehicle.estimated_range_km);
+        setTrip(buildInitialTrip(vehicle, startStation, destinationStation, route.coordinates));
+      } catch (err) {
+        if (isActive) {
+          setError(err instanceof Error ? err.message : 'Không thể bắt đầu chuyến đi');
+        }
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    }
+
+    loadSimulationData();
+    return () => { isActive = false; };
+  }, [startStationId, destinationStationId, vehicleId]); // eslint-disable-line
+
+  // ── Simulation timer — runs after data is loaded ─────────────────────────────
+  useEffect(() => {
+    if (!trip || loading || error) return;
+
+    const startedAt = Date.now();
+    intervalRef.current = setInterval(() => {
+      const elapsedMs = Date.now() - startedAt;
+      const progress = Math.min(elapsedMs / SIMULATION_DURATION_MS, 1);
+      const elapsedSeconds = Math.ceil(elapsedMs / 1000);
+      const distanceKm = Math.round(distanceRef.current * progress * 10) / 10;
+      const batteryUsed = (distanceRef.current / rangeRef.current) * 100 * progress;
+      const batteryPercent = Math.max(
+        0,
+        Math.round((batteryBeforeRef.current - batteryUsed) * 10) / 10,
+      );
+      const estimatedRangeKm = Math.round(rangeRef.current * (batteryPercent / 100) * 10) / 10;
+
+      setTrip((prev) => {
+        if (!prev) return prev;
         return {
           ...prev,
-          elapsedSeconds: newElapsed,
-          distanceKm: newDistanceKm,
-          currentCost: newCost,
-          batteryPercent: newBatteryRounded,
-          estimatedRangeKm: newRange,
-          showLowBatteryAlert: showLowBattery,
-          showNearbyStations: showLowBattery,
+          elapsedSeconds,
+          distanceKm,
+          currentCost: estimateTripCost(Math.max(1, elapsedSeconds / 60)),
+          batteryPercent,
+          estimatedRangeKm,
+          showLowBatteryAlert: batteryPercent <= 5,
+          showNearbyStations: prev.showNearbyStations || batteryPercent <= 5,
+          progress,
         };
       });
-    }, 1000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
 
-  // ── Compute simulated position along OSRM route ───────────────────────────
-  const simulatedPosition = useMemo<[number, number] | null>(() => {
-    if (routePoints.length < 2 || routeDistanceKm === 0) return departurePos;
-    const fraction = Math.min(1, trip.distanceKm / routeDistanceKm);
-    return interpolate(routePoints, routeCumulative, fraction);
-  }, [routePoints, routeCumulative, routeDistanceKm, trip.distanceKm, departurePos]);
+      if (progress >= 1) {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        if (!autoEndedRef.current) {
+          autoEndedRef.current = true;
+          setShowEndModal(true);
+        }
+      }
+    }, 100);
+
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [trip?.tripId, loading, error]); // eslint-disable-line
 
   const handleEndTrip = () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     setShowEndModal(true);
   };
+
+  // ── Loading / error states ───────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="relative flex flex-col h-screen bg-background overflow-hidden items-center justify-center">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 size={18} className="animate-spin text-primary" />
+          <span className="text-sm font-semibold">Đang khởi động chuyến đi...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <div className="relative flex flex-col h-screen bg-background overflow-hidden items-center justify-center px-6 text-center">
+        <div className="rounded-2xl bg-card border border-danger/30 p-5 shadow-card">
+          <AlertTriangle size={24} className="text-danger mx-auto mb-2" />
+          <p className="text-sm font-bold text-foreground">Không thể bắt đầu chuyến đi</p>
+          <p className="text-xs text-muted-foreground mt-1">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex flex-col h-screen bg-background overflow-hidden">
@@ -203,7 +277,9 @@ export default function ActiveTripClient({ fromStationId, toStationId, vehicleMo
         <LowBatteryAlert
           batteryPercent={trip.batteryPercent}
           rangeKm={trip.estimatedRangeKm}
-          onViewStations={() => setTrip((p) => ({ ...p, showNearbyStations: true }))}
+          onViewStations={() =>
+            setTrip((prev) => prev ? { ...prev, showNearbyStations: true } : prev)
+          }
         />
       )}
 
@@ -216,16 +292,20 @@ export default function ActiveTripClient({ fromStationId, toStationId, vehicleMo
       <TripMapView
         batteryPercent={trip.batteryPercent}
         distanceKm={trip.distanceKm}
-        simulatedPosition={simulatedPosition}
-        routePoints={routePoints}
-        destinationPosition={destinationPos}
-        hasDestination={!!toStationId}
+        progress={trip.progress}
+        startStationName={trip.startStationName}
+        destinationStationName={trip.destinationStationName}
+        startCoordinate={trip.startCoordinate}
+        destinationCoordinate={trip.destinationCoordinate}
+        routeCoordinates={trip.routeCoordinates}
       />
 
       <TripStatsBar trip={trip} onEndTrip={handleEndTrip} />
 
       {trip.showNearbyStations && (
-        <NearbyStationSheet onClose={() => setTrip((p) => ({ ...p, showNearbyStations: false }))} />
+        <NearbyStationSheet
+          onClose={() => setTrip((prev) => prev ? { ...prev, showNearbyStations: false } : prev)}
+        />
       )}
 
       {showEndModal && (

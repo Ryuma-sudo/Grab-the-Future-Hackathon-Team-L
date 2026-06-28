@@ -1,35 +1,28 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Vehicle } from '../../../lib/mockData';
+import type { ApiVehicle } from '../../../lib/api';
 
 interface BellRingModalProps {
-  vehicle: Vehicle;
+  vehicle: ApiVehicle;
   onClose: () => void;
 }
 
 export default function BellRingModal({ vehicle, onClose }: BellRingModalProps) {
-  const hasShaken = useRef(false);
-
-  // Close on Escape key
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  // Prevent body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
 
-  hasShaken.current = true;
-
   return (
     <>
-      {/* CSS animation keyframes */}
       <style>{`
         @keyframes bell-ring {
           0%   { transform: rotate(0deg); }
@@ -57,18 +50,11 @@ export default function BellRingModal({ vehicle, onClose }: BellRingModalProps) 
           transform-origin: top center;
           display: inline-block;
         }
-        .ring-wave {
-          animation: ring-pulse 1.6s ease-out infinite;
-        }
-        .ring-wave-2 {
-          animation: ring-pulse 1.6s ease-out 0.4s infinite;
-        }
-        .ring-wave-3 {
-          animation: ring-pulse 1.6s ease-out 0.8s infinite;
-        }
+        .ring-wave   { animation: ring-pulse 1.6s ease-out infinite; }
+        .ring-wave-2 { animation: ring-pulse 1.6s ease-out 0.4s infinite; }
+        .ring-wave-3 { animation: ring-pulse 1.6s ease-out 0.8s infinite; }
       `}</style>
 
-      {/* Overlay */}
       <div
         className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center px-6"
         onClick={onClose}
@@ -77,7 +63,6 @@ export default function BellRingModal({ vehicle, onClose }: BellRingModalProps) 
           className="bg-card rounded-3xl p-7 w-full max-w-sm shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close button */}
           <div className="flex justify-end mb-1">
             <button
               onClick={onClose}
@@ -87,34 +72,27 @@ export default function BellRingModal({ vehicle, onClose }: BellRingModalProps) 
             </button>
           </div>
 
-          {/* Animated bell */}
           <div className="flex justify-center mb-5 relative">
-            {/* Ripple rings */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="w-20 h-20 rounded-full border-2 border-primary/40 ring-wave" />
               <div className="absolute w-20 h-20 rounded-full border-2 border-primary/30 ring-wave-2" />
               <div className="absolute w-20 h-20 rounded-full border-2 border-primary/20 ring-wave-3" />
             </div>
-
-            {/* Bell icon */}
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center z-10">
               <span className="bell-icon text-5xl select-none">🔔</span>
             </div>
           </div>
 
-          {/* Text */}
           <div className="text-center mb-6">
             <p className="text-base font-bold text-foreground mb-1">Xe đang reo chuông!</p>
             <p className="text-sm text-muted-foreground">
-              {vehicle.model} tại ô{' '}
-              <span className="font-bold text-foreground">{vehicle.slotNumber}</span>
+              {vehicle.code}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Lại gần trạm và nghe tiếng chuông để xác định xe
             </p>
           </div>
 
-          {/* Stop button */}
           <button
             onClick={onClose}
             className="w-full py-3.5 bg-foreground text-background rounded-2xl text-sm font-bold active:scale-[0.98] transition-all duration-150"
