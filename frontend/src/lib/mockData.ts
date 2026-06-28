@@ -87,6 +87,43 @@ export const MOCK_STATIONS: Station[] = [
         lat: 10.8681, lng: 106.8021,
         availableVehicles: 2, totalVehicles: 6, status: 'open',
     },
+    // ── Trạm xa — demo dải giá tiền phong phú ───────────────────────────────
+    // ~2.4km → ước 9 phút đi xe → ~11.000đ
+    {
+        id: 'station-007',
+        name: 'Trạm Khu Công Nghệ Cao TP.HCM',
+        address: 'Đường D1, Khu CNC, Linh Trung, Thủ Đức, TP.HCM',
+        distance: 2420,  walkMinutes: 30,
+        lat: 10.8521, lng: 106.8162,
+        availableVehicles: 5, totalVehicles: 8, status: 'open',
+    },
+    // ~3.8km → ước 15 phút → ~17.000đ
+    {
+        id: 'station-008',
+        name: 'Trạm Bến Xe Suối Tiên',
+        address: 'Xa lộ Hà Nội, Tăng Nhơn Phú B, Thủ Đức, TP.HCM',
+        distance: 3800,  walkMinutes: 47,
+        lat: 10.8945, lng: 106.8240,
+        availableVehicles: 4, totalVehicles: 7, status: 'open',
+    },
+    // ~5.8km → ước 23 phút → ~25.000đ
+    {
+        id: 'station-009',
+        name: 'Trạm Tam Bình - Thủ Đức',
+        address: 'Ngã tư Bình Triệu, Tam Bình, Thủ Đức, TP.HCM',
+        distance: 5800,  walkMinutes: 72,
+        lat: 10.8350, lng: 106.7560,
+        availableVehicles: 6, totalVehicles: 9, status: 'open',
+    },
+    // ~8.0km → ước 32 phút → ~34.000đ
+    {
+        id: 'station-010',
+        name: 'Trạm Bến Xe Miền Đông (mới)',
+        address: 'Đường Hoàng Hữu Nam, Long Bình, Thủ Đức, TP.HCM',
+        distance: 8000,  walkMinutes: 100,
+        lat: 10.7960, lng: 106.8021,
+        availableVehicles: 3, totalVehicles: 6, status: 'open',
+    },
 ];
 
 // ── Vehicles — all Yadea, consistent with station available/total counts ──────
@@ -156,6 +193,44 @@ export const MOCK_VEHICLES: Vehicle[] = [
     { id: 'v-604', stationId: 'station-006', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 60, estimatedRangeKm: 36, status: 'busy',         slotNumber: 'B2', lastCharged: 'Đang dùng'     },
     { id: 'v-605', stationId: 'station-006', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 80, estimatedRangeKm: 48, status: 'busy',         slotNumber: 'B3', lastCharged: 'Đang dùng'     },
     { id: 'v-606', stationId: 'station-006', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 55, estimatedRangeKm: 33, status: 'busy',         slotNumber: 'C1', lastCharged: 'Đang dùng'     },
+
+    // ── Station 007 — Khu CNC TP.HCM (5 available / 8 total) ─────────────────
+    { id: 'v-701', stationId: 'station-007', type: 'scooter', model: 'Yadea G5',       batteryPercent: 93, estimatedRangeKm: 56, status: 'available',    slotNumber: 'A1', lastCharged: '07:20 hôm nay' },
+    { id: 'v-702', stationId: 'station-007', type: 'scooter', model: 'Yadea G5',       batteryPercent: 78, estimatedRangeKm: 47, status: 'available',    slotNumber: 'A2', lastCharged: '05:50 hôm nay' },
+    { id: 'v-703', stationId: 'station-007', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 61, estimatedRangeKm: 37, status: 'available',    slotNumber: 'B1', lastCharged: '03:30 hôm nay' },
+    { id: 'v-704', stationId: 'station-007', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 44, estimatedRangeKm: 26, status: 'available',    slotNumber: 'B2', lastCharged: '01:00 hôm nay' },
+    { id: 'v-705', stationId: 'station-007', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 85, estimatedRangeKm: 51, status: 'available',    slotNumber: 'C1', lastCharged: '06:45 hôm nay' },
+    { id: 'v-706', stationId: 'station-007', type: 'scooter', model: 'Yadea G5',       batteryPercent: 22, estimatedRangeKm: 13, status: 'charging',     slotNumber: 'C2', lastCharged: 'Đang sạc'      },
+    { id: 'v-707', stationId: 'station-007', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 68, estimatedRangeKm: 41, status: 'busy',         slotNumber: 'D1', lastCharged: 'Đang dùng'     },
+    { id: 'v-708', stationId: 'station-007', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 50, estimatedRangeKm: 30, status: 'busy',         slotNumber: 'D2', lastCharged: 'Đang dùng'     },
+
+    // ── Station 008 — Bến Xe Suối Tiên (4 available / 7 total) ───────────────
+    { id: 'v-801', stationId: 'station-008', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 89, estimatedRangeKm: 53, status: 'available',    slotNumber: 'A1', lastCharged: '07:00 hôm nay' },
+    { id: 'v-802', stationId: 'station-008', type: 'scooter', model: 'Yadea G5',       batteryPercent: 70, estimatedRangeKm: 42, status: 'available',    slotNumber: 'A2', lastCharged: '05:15 hôm nay' },
+    { id: 'v-803', stationId: 'station-008', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 52, estimatedRangeKm: 31, status: 'available',    slotNumber: 'B1', lastCharged: '02:20 hôm nay' },
+    { id: 'v-804', stationId: 'station-008', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 36, estimatedRangeKm: 22, status: 'available',    slotNumber: 'B2', lastCharged: '23:40 hôm qua' },
+    { id: 'v-805', stationId: 'station-008', type: 'scooter', model: 'Yadea G5',       batteryPercent: 14, estimatedRangeKm:  8, status: 'charging',     slotNumber: 'C1', lastCharged: 'Đang sạc'      },
+    { id: 'v-806', stationId: 'station-008', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 80, estimatedRangeKm: 48, status: 'busy',         slotNumber: 'C2', lastCharged: 'Đang dùng'     },
+    { id: 'v-807', stationId: 'station-008', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 63, estimatedRangeKm: 38, status: 'busy',         slotNumber: 'D1', lastCharged: 'Đang dùng'     },
+
+    // ── Station 009 — Tam Bình Thủ Đức (6 available / 9 total) ───────────────
+    { id: 'v-901', stationId: 'station-009', type: 'scooter', model: 'Yadea G5',       batteryPercent: 96, estimatedRangeKm: 58, status: 'available',    slotNumber: 'A1', lastCharged: '07:55 hôm nay' },
+    { id: 'v-902', stationId: 'station-009', type: 'scooter', model: 'Yadea G5',       batteryPercent: 83, estimatedRangeKm: 50, status: 'available',    slotNumber: 'A2', lastCharged: '06:10 hôm nay' },
+    { id: 'v-903', stationId: 'station-009', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 65, estimatedRangeKm: 39, status: 'available',    slotNumber: 'A3', lastCharged: '04:00 hôm nay' },
+    { id: 'v-904', stationId: 'station-009', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 48, estimatedRangeKm: 29, status: 'available',    slotNumber: 'B1', lastCharged: '01:30 hôm nay' },
+    { id: 'v-905', stationId: 'station-009', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 77, estimatedRangeKm: 46, status: 'available',    slotNumber: 'B2', lastCharged: '06:30 hôm nay' },
+    { id: 'v-906', stationId: 'station-009', type: 'scooter', model: 'Yadea G5',       batteryPercent: 58, estimatedRangeKm: 35, status: 'available',    slotNumber: 'B3', lastCharged: '03:15 hôm nay' },
+    { id: 'v-907', stationId: 'station-009', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 28, estimatedRangeKm: 17, status: 'charging',     slotNumber: 'C1', lastCharged: 'Đang sạc'      },
+    { id: 'v-908', stationId: 'station-009', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 72, estimatedRangeKm: 43, status: 'busy',         slotNumber: 'C2', lastCharged: 'Đang dùng'     },
+    { id: 'v-909', stationId: 'station-009', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 40, estimatedRangeKm: 24, status: 'busy',         slotNumber: 'D1', lastCharged: 'Đang dùng'     },
+
+    // ── Station 010 — Bến Xe Miền Đông mới (3 available / 6 total) ───────────
+    { id: 'v-1001', stationId: 'station-010', type: 'scooter', model: 'Yadea G5',       batteryPercent: 88, estimatedRangeKm: 53, status: 'available',    slotNumber: 'A1', lastCharged: '07:10 hôm nay' },
+    { id: 'v-1002', stationId: 'station-010', type: 'scooter', model: 'Yadea T9 Pro',   batteryPercent: 73, estimatedRangeKm: 44, status: 'available',    slotNumber: 'A2', lastCharged: '05:40 hôm nay' },
+    { id: 'v-1003', stationId: 'station-010', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 59, estimatedRangeKm: 35, status: 'available',    slotNumber: 'B1', lastCharged: '03:00 hôm nay' },
+    { id: 'v-1004', stationId: 'station-010', type: 'scooter', model: 'Yadea EM10 Pro', batteryPercent: 17, estimatedRangeKm: 10, status: 'charging',     slotNumber: 'B2', lastCharged: 'Đang sạc'      },
+    { id: 'v-1005', stationId: 'station-010', type: 'scooter', model: 'Yadea G5',       batteryPercent: 91, estimatedRangeKm: 55, status: 'busy',         slotNumber: 'C1', lastCharged: 'Đang dùng'     },
+    { id: 'v-1006', stationId: 'station-010', type: 'scooter', model: 'Yadea C1S',      batteryPercent: 64, estimatedRangeKm: 38, status: 'busy',         slotNumber: 'C2', lastCharged: 'Đang dùng'     },
 ];
 
 export function formatVND(amount: number): string {

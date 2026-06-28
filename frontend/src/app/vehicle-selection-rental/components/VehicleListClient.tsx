@@ -4,10 +4,11 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MOCK_VEHICLES, formatVND, TRIP_BASE_FEE, TRIP_EXTRA_RATE } from '../../../lib/mockData';
 import type { Vehicle } from '../../../lib/mockData';
-import { Zap, Battery, Route, Clock, AlertTriangle } from 'lucide-react';
+import { Zap, Battery, Route, Clock, AlertTriangle, Bell } from 'lucide-react';
 import BatteryIndicator from '../../../components/ui/BatteryIndicator';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import QRScanModal from './QRScanModal';
+import BellRingModal from './BellRingModal';
 
 export default function VehicleListClient() {
   const searchParams = useSearchParams();
@@ -21,14 +22,17 @@ export default function VehicleListClient() {
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showQR, setShowQR] = useState(false);
-  const [sortBy, setSortBy] = useState<'battery' | 'price'>('battery');
+  const [sortBy, setSortBy] = useState<'battery' | 'range'>('battery');
+  const [ringingVehicle, setRingingVehicle] = useState<Vehicle | null>(null);
 
   const stationVehicles = MOCK_VEHICLES.filter(
     (v) => v.stationId === stationMockId && v.status === 'available'
   );
 
   const filtered = [...stationVehicles].sort((a, b) =>
-    sortBy === 'battery' ? b.batteryPercent - a.batteryPercent : a.pricePerMinute - b.pricePerMinute
+    sortBy === 'battery'
+      ? b.batteryPercent - a.batteryPercent
+      : b.estimatedRangeKm - a.estimatedRangeKm
   );
 
   const handleSelectVehicle = (vehicle: Vehicle, cantReach: boolean) => {
@@ -58,13 +62,13 @@ export default function VehicleListClient() {
             Pin cao nhất
           </button>
           <button
-            onClick={() => setSortBy('price')}
+            onClick={() => setSortBy('range')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 ${
-              sortBy === 'price' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground'
+              sortBy === 'range' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground'
             }`}
           >
             <Zap size={11} />
-            Giá thấp nhất
+            Quãng đường xa nhất
           </button>
         </div>
 
@@ -122,7 +126,7 @@ export default function VehicleListClient() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5">
+                  <div className="flex flex-col items-end gap-2">
                     {isUnavailable ? (
                       <StatusBadge variant="busy" label="Không có" />
                     ) : cantReach ? (
@@ -133,6 +137,19 @@ export default function VehicleListClient() {
                       <StatusBadge variant="low-battery" label="Pin yếu" />
                     ) : (
                       <StatusBadge variant="available" />
+                    )}
+                    {/* Bell button — locate vehicle by sound */}
+                    {!isUnavailable && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRingingVehicle(vehicle);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-medium active:scale-90 hover:bg-amber-100 transition-all duration-150"
+                      >
+                        <Bell size={11} />
+                        Tìm xe
+                      </button>
                     )}
                   </div>
                 </div>
@@ -253,6 +270,13 @@ export default function VehicleListClient() {
           fromId={fromId}
           toId={toId}
           onClose={() => setShowQR(false)}
+        />
+      )}
+
+      {ringingVehicle && (
+        <BellRingModal
+          vehicle={ringingVehicle}
+          onClose={() => setRingingVehicle(null)}
         />
       )}
     </div>
