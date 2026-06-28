@@ -2,33 +2,42 @@
 
 import React, { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MOCK_VEHICLES, formatVND } from '../../../lib/mockData';
+import { MOCK_VEHICLES, formatVND, TRIP_BASE_FEE, TRIP_EXTRA_RATE } from '../../../lib/mockData';
 import type { Vehicle } from '../../../lib/mockData';
-import { Zap, Battery, Route, Clock, AlertTriangle } from 'lucide-react';
+import { Zap, Battery, Route, Clock, AlertTriangle, Bell } from 'lucide-react';
 import BatteryIndicator from '../../../components/ui/BatteryIndicator';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import QRScanModal from './QRScanModal';
+import BellRingModal from './BellRingModal';
 
 export default function VehicleListClient() {
   const searchParams = useSearchParams();
   const fromId = searchParams.get('from');
   const toId = searchParams.get('to');
+  const distParam = searchParams.get('dist');
+  const distanceKm = distParam ? parseFloat(distParam) : null;
+
+  // Map numeric fromId → mock stationId string
+  const stationMockId = fromId ? `station-${String(parseInt(fromId, 10)).padStart(3, '0')}` : 'station-001';
 
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [showQR, setShowQR] = useState(false);
-  const [sortBy, setSortBy] = useState<'battery' | 'price'>('battery');
+  const [sortBy, setSortBy] = useState<'battery' | 'range'>('battery');
+  const [ringingVehicle, setRingingVehicle] = useState<Vehicle | null>(null);
 
-  // Only show electric scooters from station-001
   const stationVehicles = MOCK_VEHICLES.filter(
-    (v) => v.stationId === 'station-001' && v.type === 'scooter'
+    (v) => v.stationId === stationMockId && v.status === 'available'
   );
 
   const filtered = [...stationVehicles].sort((a, b) =>
-    sortBy === 'battery' ? b.batteryPercent - a.batteryPercent : a.pricePerMinute - b.pricePerMinute
+    sortBy === 'battery'
+      ? b.batteryPercent - a.batteryPercent
+      : b.estimatedRangeKm - a.estimatedRangeKm
   );
 
-  const handleSelectVehicle = (vehicle: Vehicle) => {
+  const handleSelectVehicle = (vehicle: Vehicle, cantReach: boolean) => {
     if (vehicle.status !== 'available') return;
+    if (cantReach) return;
     setSelectedVehicle(vehicle);
   };
 
@@ -53,15 +62,24 @@ export default function VehicleListClient() {
             Pin cao nhất
           </button>
           <button
-            onClick={() => setSortBy('price')}
+            onClick={() => setSortBy('range')}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 ${
-              sortBy === 'price' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground'
+              sortBy === 'range' ? 'bg-secondary text-secondary-foreground' : 'text-muted-foreground'
             }`}
           >
             <Zap size={11} />
-            Giá thấp nhất
+            Quãng đường xa nhất
           </button>
         </div>
+
+        {/* Distance to destination context */}
+        {distanceKm !== null && (
+          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+            <Route size={10} className="text-primary" />
+            Tới đích: <span className="font-bold text-foreground">{distanceKm} km</span>
+            {' '}— xe mờ không đủ pin để đến nơi
+          </div>
+        )}
       </div>
 
       {/* Vehicle list */}
@@ -72,17 +90,20 @@ export default function VehicleListClient() {
             const isLowBattery = vehicle.batteryPercent <= 20;
             const isCritical = vehicle.batteryPercent <= 5;
             const isUnavailable = vehicle.status !== 'available';
+            const cantReach =
+              distanceKm !== null && vehicle.estimatedRangeKm < distanceKm;
+            const isDisabled = isUnavailable || cantReach;
 
             return (
               <div
                 key={vehicle.id}
-                onClick={() => handleSelectVehicle(vehicle)}
-                className={`vehicle-card-hover rounded-2xl border-2 p-4 cursor-pointer transition-all duration-200 ${
-                  isUnavailable
-                    ? 'opacity-60 cursor-not-allowed border-border bg-muted/30'
+                onClick={() => handleSelectVehicle(vehicle, cantReach)}
+                className={`vehicle-card-hover rounded-2xl border-2 p-4 transition-all duration-200 ${
+                  isDisabled
+                    ? 'opacity-50 cursor-not-allowed border-border bg-muted/30'
                     : isSelected
-                    ? 'border-primary bg-secondary/40 shadow-card-lg'
-                    : 'border-border bg-card hover:border-primary/40'
+                    ? 'border-primary bg-secondary/40 shadow-card-lg cursor-pointer'
+                    : 'border-border bg-card hover:border-primary/40 cursor-pointer'
                 }`}
               >
                 {/* Header row */}
@@ -90,10 +111,10 @@ export default function VehicleListClient() {
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        isSelected ? 'bg-primary/20' : 'bg-muted'
+                        isDisabled ? 'bg-muted' : isSelected ? 'bg-primary/20' : 'bg-muted'
                       }`}
                     >
-                      <svg viewBox="0 0 24 24" className={`w-7 h-7 ${isSelected ? 'text-primary' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <svg viewBox="0 0 24 24" className={`w-7 h-7 ${isSelected && !isDisabled ? 'text-primary' : 'text-muted-foreground'}`} fill="none" stroke="currentColor" strokeWidth="1.8">
                         <circle cx="6" cy="17" r="3" /><circle cx="18" cy="17" r="3" />
                         <path d="M6 17h2l4-8h2l2 5H6" />
                         <path d="M14 9l1-4h3" />
@@ -105,15 +126,30 @@ export default function VehicleListClient() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-end gap-1.5">
+                  <div className="flex flex-col items-end gap-2">
                     {isUnavailable ? (
                       <StatusBadge variant="busy" label="Không có" />
+                    ) : cantReach ? (
+                      <StatusBadge variant="low-battery" label="Pin không đủ" />
                     ) : isCritical ? (
                       <StatusBadge variant="low-battery" label="Pin cạn" />
                     ) : isLowBattery ? (
                       <StatusBadge variant="low-battery" label="Pin yếu" />
                     ) : (
                       <StatusBadge variant="available" />
+                    )}
+                    {/* Bell button — locate vehicle by sound */}
+                    {!isUnavailable && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRingingVehicle(vehicle);
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 text-[10px] font-medium active:scale-90 hover:bg-amber-100 transition-all duration-150"
+                      >
+                        <Bell size={11} />
+                        Tìm xe
+                      </button>
                     )}
                   </div>
                 </div>
@@ -131,7 +167,8 @@ export default function VehicleListClient() {
                           vehicle.batteryPercent <= 5
                             ? 'bg-danger'
                             : vehicle.batteryPercent <= 20
-                            ? 'bg-warning' :'bg-primary'
+                            ? 'bg-warning'
+                            : 'bg-primary'
                         }`}
                         style={{ width: `${vehicle.batteryPercent}%` }}
                       />
@@ -141,19 +178,21 @@ export default function VehicleListClient() {
 
                 {/* Stats row */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col items-center bg-muted rounded-xl p-2">
+                  <div className={`flex flex-col items-center rounded-xl p-2 ${cantReach ? 'bg-red-50' : 'bg-muted'}`}>
                     <div className="flex items-center gap-1 mb-0.5">
-                      <Route size={10} className="text-muted-foreground" />
-                      <span className="text-xs font-bold text-foreground tabular-nums">{vehicle.estimatedRangeKm} km</span>
+                      <Route size={10} className={cantReach ? 'text-danger' : 'text-muted-foreground'} />
+                      <span className={`text-xs font-bold tabular-nums ${cantReach ? 'text-danger' : 'text-foreground'}`}>
+                        {vehicle.estimatedRangeKm} km
+                      </span>
                     </div>
                     <span className="text-[9px] text-muted-foreground">Còn đi được</span>
                   </div>
-                  <div className="flex flex-col items-center bg-muted rounded-xl p-2">
+                  <div className="flex flex-col items-center bg-primary/8 rounded-xl p-2">
                     <div className="flex items-center gap-1 mb-0.5">
-                      <Clock size={10} className="text-muted-foreground" />
-                      <span className="text-xs font-bold text-foreground tabular-nums">{formatVND(vehicle.pricePerMinute)}</span>
+                      <Clock size={10} className="text-primary" />
+                      <span className="text-xs font-bold text-primary tabular-nums">{formatVND(TRIP_BASE_FEE)}</span>
                     </div>
-                    <span className="text-[9px] text-muted-foreground">mỗi phút</span>
+                    <span className="text-[9px] text-muted-foreground">5 phút đầu</span>
                   </div>
                   <div className="flex flex-col items-center bg-muted rounded-xl p-2">
                     <div className="flex items-center gap-1 mb-0.5">
@@ -164,8 +203,18 @@ export default function VehicleListClient() {
                   </div>
                 </div>
 
-                {/* Critical battery warning */}
-                {isCritical && !isUnavailable && (
+                {/* Insufficient range warning */}
+                {cantReach && (
+                  <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+                    <AlertTriangle size={13} className="text-danger flex-shrink-0" />
+                    <p className="text-[10px] text-danger font-medium">
+                      Pin không đủ để tới đích — cần {distanceKm} km, xe chỉ đi được {vehicle.estimatedRangeKm} km.
+                    </p>
+                  </div>
+                )}
+
+                {/* Critical battery warning (only when not already showing cantReach) */}
+                {isCritical && !isUnavailable && !cantReach && (
                   <div className="mt-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                     <AlertTriangle size={13} className="text-danger flex-shrink-0" />
                     <p className="text-[10px] text-danger font-medium">
@@ -175,7 +224,7 @@ export default function VehicleListClient() {
                 )}
 
                 {/* Selected indicator */}
-                {isSelected && (
+                {isSelected && !isDisabled && (
                   <div className="mt-3 flex items-center justify-center gap-2 py-2 bg-primary/10 rounded-xl">
                     <div className="w-2 h-2 rounded-full bg-primary pulse-dot" />
                     <span className="text-xs font-bold text-primary">Đã chọn xe này</span>
@@ -197,9 +246,9 @@ export default function VehicleListClient() {
                 <p className="text-sm font-bold text-foreground truncate">{selectedVehicle.model}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground">Giá</p>
+                <p className="text-xs text-muted-foreground">Giá khởi điểm</p>
                 <p className="text-sm font-bold text-primary tabular-nums">
-                  {formatVND(selectedVehicle.pricePerMinute)}/phút
+                  {formatVND(TRIP_BASE_FEE)} / 5 phút
                 </p>
               </div>
               <BatteryIndicator percent={selectedVehicle.batteryPercent} size="sm" />
@@ -221,6 +270,13 @@ export default function VehicleListClient() {
           fromId={fromId}
           toId={toId}
           onClose={() => setShowQR(false)}
+        />
+      )}
+
+      {ringingVehicle && (
+        <BellRingModal
+          vehicle={ringingVehicle}
+          onClose={() => setRingingVehicle(null)}
         />
       )}
     </div>

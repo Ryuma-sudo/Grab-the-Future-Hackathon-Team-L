@@ -6,6 +6,7 @@ import React, { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { calculateTripCost, formatVND as fmtVND } from '../../lib/mockData';
 
 export interface ApiStation {
   id: number;
@@ -39,6 +40,9 @@ interface LeafletMapComponentProps {
   routePoints?: [number, number][];
   /** Show dashed straight line while route is loading */
   routeLoading?: boolean;
+  /** Fly map to a specific position (e.g. from search) */
+  focusPosition?: [number, number] | null;
+  focusTrigger?: number;
 }
 
 // Default center: ĐHQG-HCM campus area (Linh Trung, Thủ Đức, TP.HCM)
@@ -155,6 +159,15 @@ function RecenterMap({ position, trigger }: { position: [number, number]; trigge
   return null;
 }
 
+function FocusStation({ position, trigger }: { position: [number, number]; trigger?: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(position, 17, { animate: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger]);
+  return null;
+}
+
 function FitRoute({ points }: { points: [number, number][] }) {
   const map = useMap();
   useEffect(() => {
@@ -177,9 +190,8 @@ function calcCostLabel(from: ApiStation, to: ApiStation): string {
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const dur = Math.round(distKm * 4);
-  const cost = dur * 1500;
-  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(cost);
+  const durationMin = Math.round(distKm * 4); // ~15 km/h scooter → 4 min/km
+  return fmtVND(calculateTripCost(durationMin));
 }
 
 export default function LeafletMapComponent({
@@ -192,6 +204,8 @@ export default function LeafletMapComponent({
   recenterTrigger,
   routePoints = [],
   routeLoading = false,
+  focusPosition,
+  focusTrigger,
 }: LeafletMapComponentProps) {
   const departureStation = stations.find((s) => s.id === departureId);
   const destinationStation = stations.find((s) => s.id === destinationId);
@@ -222,6 +236,7 @@ export default function LeafletMapComponent({
       />
 
       {userPosition && <RecenterMap position={userPosition} trigger={recenterTrigger} />}
+      {focusPosition && <FocusStation position={focusPosition} trigger={focusTrigger} />}
 
       {/* Fit map to show full route once loaded */}
       {routePoints.length >= 2 && <FitRoute points={routePoints} />}

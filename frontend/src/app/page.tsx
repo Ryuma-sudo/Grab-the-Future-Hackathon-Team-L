@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import AuthScreen from './sign-up-login/AuthScreen';
 import MobileLayout from '../components/MobileLayout';
 import MapView from './components/MapView';
-import MapTopBar from './components/MapTopBar';
 
 const AUTH_STORAGE_KEY = 'evride-authenticated';
 
@@ -26,10 +25,7 @@ export default function HomePage() {
 
   return (
     <MobileLayout>
-      <div className="relative flex flex-col h-screen">
-        <MapTopBar />
-        <MapView />
-      </div>
+      <MapView />
     </MobileLayout>
   );
 }
