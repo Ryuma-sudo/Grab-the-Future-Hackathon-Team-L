@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Clock, Route, Wallet, Zap, ChevronUp, Square } from 'lucide-react';
 import type { TripState } from './ActiveTripClient';
-import { formatVND } from '../../../lib/mockData';
+import { formatVND } from '../../../lib/api';
 import BatteryIndicator from '../../../components/ui/BatteryIndicator';
 
 interface TripStatsBarProps {
@@ -120,10 +120,10 @@ export default function TripStatsBar({ trip, onEndTrip }: TripStatsBarProps) {
               {[
                 { label: 'Mã chuyến', value: `#${trip.tripId}` },
                 { label: 'Xe', value: trip.vehicleModel },
-                { label: 'Trạm xuất phát', value: 'Trạm Hồ Hoàn Kiếm' },
-                { label: 'Giá mỗi phút', value: formatVND(trip.pricePerMinute) },
-                { label: 'Tốc độ trung bình', value: '12 km/h' },
-                { label: 'Bảo hiểm', value: 'Đã bao gồm' },
+                { label: 'Tram xuat phat', value: trip.startStationName },
+                { label: 'Tram den', value: trip.destinationStationName },
+                { label: 'Gia sau 5 phut', value: `${formatVND(trip.pricePerMinute)}/phut` },
+                { label: 'Simulation', value: `${Math.round(trip.progress * 100)}%` },
               ].map((row) => (
                 <div key={`detail-${row.label}`} className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{row.label}</span>
